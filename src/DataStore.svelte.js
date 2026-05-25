@@ -4,6 +4,7 @@ import { PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY } from '$env/static/publi
 // Utility
 import logger from '@utils/logger';
 import makeObservable from '@utils/EventEmitter';
+import { goto } from '$app/navigation';
 // Model classes
 import * as Factories from '@lib/data';
 
@@ -299,6 +300,18 @@ export default class DataStore {
 
     //Supabase
     this.supabase = createClient(PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY);
+
+    this.supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_IN' && session) {
+        this.user = session.user;
+        goto('/games');
+      } else if (event === 'PASSWORD_RECOVERY' && session) {
+        this.user = session.user;
+        goto('/reset-password');
+      } else if (event === 'SIGNED_OUT') {
+        this.user = null;
+      }
+    });
 
     /**
      * Create functions for tables
