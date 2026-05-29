@@ -20,7 +20,8 @@
 		"migration:new": "supabase migration new",
 		"migration:push": "supabase db push",
 		"migration:status": "supabase db remote status",
-		"db:pull": "supabase db pull"
+		"db:pull": "supabase db pull",
+		"db:schema": "bash scripts/dump-schema.sh"
 	},
 	"devDependencies": {
 		"@playwright/test": "^1.49.1",
