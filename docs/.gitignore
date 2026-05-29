@@ -1,0 +1,18 @@
+# Obsidian vault config (root and any nested vault)
+.obsidian/
+
+# Syncthing
+.stfolder/
+.stversions/
+
+# Obsidian trash
+.trash/
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Backup & temp files
+*.swp
+*.tmp
+*.bak
