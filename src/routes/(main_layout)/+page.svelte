@@ -26,8 +26,11 @@
       Explore a world where every decision matters and shapes your unique journey.
     </p>
     
-    {#if store?.user} 
-      <a href="{getPath('/games')}" class="cta-button">Play Now</a>
+    {#if store?.user}
+    <div style="display:flex; gap: 1.5rem; flex-wrap: wrap; justify-content: center;">
+      <a href="{getPath('/characters')}" class="cta-button">My Characters</a>
+      <a href="{getPath('/games')}" class="cta-button">My Games</a>
+    </div>
     {:else if !store?.user_loading}
     <div style="display:flex; gap: 1.5rem">
       <a href="{getPath('/login')}" class="cta-button">Login</a>

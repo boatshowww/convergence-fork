@@ -10,6 +10,7 @@
   // sandbox on a mock character.
   import { getContext, setContext, onMount } from 'svelte';
   import { page } from '$app/state';
+  import { getPath } from '@utils/navigation';
   import { PlayerCheck } from './playerCheck.svelte.js';
   import CharacterSheet from './components/CharacterSheet.svelte';
   import StarMap from './components/StarMap.svelte';
@@ -19,11 +20,13 @@
   const check = new PlayerCheck();
   setContext('check', check);
 
-  let status = $state('mock'); // mock | loading | ready | error | not-player
+  let status = $state('mock'); // mock | loading | ready | error | no-character
   let statusMsg = $state('');
+  let gameId = $state(null);
+  let isGM = $state(false); // also the GM here? -> offer a "switch to GM view" link
 
   onMount(() => {
-    const gameId = page.url.searchParams.get('game_id');
+    gameId = page.url.searchParams.get('game_id');
     if (!gameId) return; // no game context -> local sandbox with the mock character
 
     status = 'loading';
@@ -35,16 +38,19 @@
         await Promise.all([store.load_skills?.(), store.load_stats?.()]);
         await store.data.game.load_players();
 
+        // The player view is gated on HAVING A CHARACTER in this game (not on seat
+        // role) so a GM who brought their own character can also play here.
         const seat = store.data.players.find((p) => p.user_id === store.user?.id);
-        if (!seat) { status = 'error'; statusMsg = 'You have no seat in this game.'; return; }
-        if (seat.role?.name !== 'Player') {
-          status = 'not-player';
-          statusMsg = `Your role in this game is "${seat.role?.name ?? 'unknown'}". The player interface is for Player seats — the GM view is not built yet.`;
+        isGM = seat?.role?.name === 'Game Master' || store.data.game?.user_id === store.user?.id;
+        const characters = seat?.characters ?? [];
+        const character = characters.find((c) => c.is_primary) ?? characters[0];
+        if (!character) {
+          status = 'no-character';
+          statusMsg = isGM
+            ? "You haven't brought a character to this game. Add one from My Characters to play, or switch to GM view."
+            : 'You have no character in this game. Add one from My Characters, or join with an invite code.';
           return;
         }
-        const characters = seat.characters ?? [];
-        const character = characters.find((c) => c.is_primary) ?? characters[0];
-        if (!character) { status = 'error'; statusMsg = 'Your seat has no character.'; return; }
 
         check.character = buildCharacterVM(character);
         check.ready = true;
@@ -98,9 +104,13 @@
 <div class="player-scope">
   {#if status === 'loading'}
     <div class="pc-msg">Loading game…</div>
-  {:else if status === 'error' || status === 'not-player'}
-    <div class="pc-msg">{statusMsg}</div>
+  {:else if status === 'error' || status === 'no-character'}
+    <div class="pc-msg">
+      {statusMsg}
+      {#if isGM && gameId}<br /><a class="pc-switch" href={getPath('/gm?game_id=' + gameId)}>⇄ Switch to GM view</a>{/if}
+    </div>
   {:else}
+  {#if isGM && gameId}<a class="pc-switch floating" href={getPath('/gm?game_id=' + gameId)}>⇄ GM view</a>{/if}
   <div class="app">
     <CharacterSheet />
     <StarMap />
@@ -186,6 +196,9 @@
       * { box-sizing: border-box; margin: 0; padding: 0; }
       button { font: inherit; color: inherit; background: none; border: none; cursor: pointer; }
       .pc-msg { height: 100%; display: grid; place-items: center; text-align: center; padding: 24px; color: var(--ink-dim); font-style: italic; font-size: 15px; line-height: 1.5; }
+      .pc-switch { color: var(--gold); font-family: 'Chakra Petch', sans-serif; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; text-decoration: none; }
+      .pc-switch.floating { position: fixed; top: 60px; right: 16px; z-index: 45; padding: 6px 10px; border: 1px solid var(--gold); border-radius: 3px; background: rgba(232, 182, 103, 0.1); }
+      .pc-switch.floating:hover { background: rgba(232, 182, 103, 0.22); }
 
       .app {
         position: relative;

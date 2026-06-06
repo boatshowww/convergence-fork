@@ -96,8 +96,9 @@
     </div>
     <!-- Menu content -->
     <a class="menu-option" href="{getPath('/')}" onclick={onMenuClick}>Home</a>
-    {#if store.user } 
-      <a class="menu-option" href="{getPath('/games')}" onclick={onMenuClick}>View Games</a>
+    {#if store.user }
+      <a class="menu-option" href="{getPath('/characters')}" onclick={onMenuClick}>My Characters</a>
+      <a class="menu-option" href="{getPath('/games')}" onclick={onMenuClick}>My Games</a>
       <a class="menu-option" href="{getPath('/logout')}" onclick={onMenuClick}>Logout</a>
     {:else}
       <a class="menu-option" href="{getPath('/login')}" onclick={onMenuClick}>Login</a>

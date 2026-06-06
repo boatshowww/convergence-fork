@@ -3,7 +3,8 @@
   // attempts. Until broadcast wiring lands (next step) this operates locally: the
   // "Stage" control shows the staged gate, and the resolutions queue is fed by
   // players' live attempts once the broadcast channel is connected.
-  let { status = 'loading', statusMsg = '', gameName = 'Game' } = $props();
+  import { getPath } from '@utils/navigation';
+  let { status = 'loading', statusMsg = '', gameName = 'Game', gameId = null, hasCharacter = false } = $props();
 
   // The GM holds the secret per-skill DCs and narrative bands. In this scaffold a
   // single preset gate stands in for the GM's prompt-builder.
@@ -32,6 +33,9 @@
       <header class="gm-head">
         <span class="gm-kind">Game Master</span>
         <span class="gm-game">{gameName}</span>
+        {#if hasCharacter && gameId}
+          <a class="gm-switch" href={getPath('/player?game_id=' + gameId)}>⇄ Player view</a>
+        {/if}
       </header>
 
       <div class="gm-banner">Live player sync activates with broadcast wiring (next step). Staging and resolution controls are in place.</div>
@@ -86,6 +90,8 @@
   .gm-head { display: flex; align-items: baseline; gap: 12px; border-bottom: 1px solid var(--edge); padding-bottom: 12px; }
   .gm-kind { font-family: 'Chakra Petch', sans-serif; font-size: 11px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--gold); }
   .gm-game { font-family: 'Chakra Petch', sans-serif; font-size: 18px; letter-spacing: 0.04em; color: var(--ink); }
+  .gm-switch { margin-left: auto; color: var(--teal); font-family: 'Chakra Petch', sans-serif; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; text-decoration: none; padding: 6px 10px; border: 1px solid var(--teal); border-radius: 3px; }
+  .gm-switch:hover { background: rgba(63, 208, 201, 0.12); }
   .gm-banner { margin: 14px 0; padding: 10px 12px; border: 1px dashed var(--edge-bright); border-radius: 4px; font-size: 12px; color: var(--ink-dim); font-style: italic; }
   .gm-body { display: grid; gap: 16px; }
   .gm-panel { border: 1px solid var(--edge); border-radius: 6px; background: linear-gradient(180deg, var(--panel-2), var(--panel)); padding: 14px 16px; }

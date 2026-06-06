@@ -17,28 +17,36 @@
   // Drives role-aware entry: a Player seat -> /player, a Game Master seat -> /gm.
   let seats = $state([]);
   let seatsLoading = $state(true);
+  let myCharacters = $state([]); // for "bring a character" when joining
+
+  // join-by-code
+  let joinCode = $state('');
+  let joinCharacterId = $state('');
+  let joinError = $state('');
+  let joining = $state(false);
 
   async function loadSeats() {
     seatsLoading = true;
     await store.checkAuth?.();
-    if (!store.user?.id) { seats = []; seatsLoading = false; return; }
+    if (!store.user?.id) { seats = []; myCharacters = []; seatsLoading = false; return; }
     const { data, error } = await store.supabase
       .from('player')
-      .select('id, game:game_id(id, name), role:role_id(name)')
+      .select('id, game:game_id(id, name, invite_code), role:role_id(name)')
       .eq('user_id', store.user.id);
     if (error) { logger.error('app', 'Failed to load seats', error); seats = []; }
     else {
       seats = (data ?? [])
         .filter((s) => s.game)
         .map((s) => ({
-          playerId: s.id,
           gameId: s.game.id,
           gameName: s.game.name,
+          inviteCode: s.game.invite_code,
           role: s.role?.name ?? 'Player',
           isGM: (s.role?.name ?? '') === 'Game Master',
         }))
         .sort((a, b) => a.gameName.localeCompare(b.gameName));
     }
+    myCharacters = await store.load_my_characters();
     seatsLoading = false;
   }
 
@@ -46,12 +54,14 @@
     return getPath(`${seat.isGM ? '/gm' : '/player'}?game_id=${seat.gameId}`);
   }
 
+  let availableCharacters = $derived(myCharacters.filter((c) => !c.game));
+
   onMount(() => {
     logger.debug('app', 'Games page mounted');
     loadSeats();
   });
 
-  // Create game modal
+  // Create game modal — creator is seated as Game Master.
   let gameModal;
   let gameName = $state('');
   let errors = $state({ name: '' });
@@ -65,10 +75,10 @@
   async function handleCreateGame(e) {
     e.preventDefault();
     if (validateForm()) {
-      await store.create_game({ name: gameName, user_id: store.user.id });
+      await store.create_game_with_gm(gameName);
       gameName = '';
       gameModal.close();
-      await loadSeats(); // reflect the new game (creator's seat handling is a known gap)
+      await loadSeats();
     }
   }
 
@@ -76,13 +86,47 @@
     gameName = '';
     errors = { name: '' };
   }
+
+  async function handleJoin(e) {
+    e.preventDefault();
+    joinError = '';
+    if (!joinCode.trim()) { joinError = 'Enter an invite code.'; return; }
+    if (!joinCharacterId) { joinError = 'Pick a character to bring.'; return; }
+    joining = true;
+    try {
+      await store.join_game_by_code(joinCode.trim(), Number(joinCharacterId));
+      joinCode = '';
+      joinCharacterId = '';
+      await loadSeats();
+    } catch (err) {
+      joinError = err?.message ?? String(err);
+    } finally {
+      joining = false;
+    }
+  }
 </script>
 
 <div class="container">
   <div style="display:flex; align-items:center;">
-    <h2>Games</h2>
+    <h2>My Games</h2>
     <button class="btn btn-primary" style="margin-left: auto;" onclick={() => gameModal.open()}>+ Create</button>
   </div>
+
+  <!-- Join a game by invite code -->
+  <form class="join-panel" onsubmit={handleJoin}>
+    <span class="join-title">Join a game</span>
+    <input type="text" placeholder="Invite code" bind:value={joinCode} />
+    {#if availableCharacters.length === 0}
+      <a href={getPath('/characters')} class="muted-link">Create a free character to bring →</a>
+    {:else}
+      <select bind:value={joinCharacterId}>
+        <option value="">Bring a character…</option>
+        {#each availableCharacters as c}<option value={c.id}>{c.name || 'Unnamed'}</option>{/each}
+      </select>
+      <button type="submit" class="btn btn-primary" disabled={joining}>Join</button>
+    {/if}
+    {#if joinError}<span class="join-error">{joinError}</span>{/if}
+  </form>
 
   {#if seatsLoading}
     <h3>Loading…</h3>
@@ -92,13 +136,16 @@
         <li style="margin: 10px 0; display: flex; align-items: center; gap: 12px;">
           <a href={entryPath(seat)}>{seat.gameName}</a>
           <span class="role-badge {seat.isGM ? 'gm' : 'player'}">{seat.role}</span>
+          {#if seat.isGM && seat.inviteCode}
+            <span class="invite-code" title="Share this code so others can join your game">code: {seat.inviteCode}</span>
+          {/if}
         </li>
       {/each}
     </ul>
   {:else}
     <div style="text-align: center;">
       <h3>You're not in any games yet.</h3>
-      <p>Create one to get started (you'll be its Game Master).</p>
+      <p>Create one (you'll be its Game Master), or join with an invite code.</p>
     </div>
   {/if}
 </div>
@@ -142,4 +189,19 @@
   }
   .role-badge.gm { color: #e8b667; }
   .role-badge.player { color: #3fd0c9; }
+  .invite-code { font-family: monospace; font-size: 0.8rem; color: #6f8d97; letter-spacing: 0.05em; }
+  .join-panel {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin: 14px 0 8px;
+    padding: 12px 14px;
+    border: 1px solid #333;
+    border-radius: 6px;
+  }
+  .join-title { font-size: 0.9rem; color: #bbb; letter-spacing: 0.04em; }
+  .join-panel input, .join-panel select { padding: 7px 9px; }
+  .join-error { color: #d05a4f; font-size: 0.85rem; }
+  .muted-link { font-size: 0.85rem; color: #6f8d97; }
 </style>

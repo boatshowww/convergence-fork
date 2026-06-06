@@ -114,6 +114,15 @@ Build sequence: prototype → local slice → real-data → role-aware routing �
 - `role.id`: 1 = Game Master, 2 = Player. RLS is wide-open placeholder (`USING(true)`).
 - Headless Playwright works for the **mock** route only (authed routes have no session) — use two real browsers for multiplayer. Browser deps already installed.
 
+### Character ownership & membership architecture (SHIPPED 2026-06-06)
+Characters are now **user-owned and game-independent** (full plan: `~/.claude/plans/zesty-orbiting-willow.md`).
+Schema added: `character.user_id`, nullable `character.game_id`, `game.invite_code`, and `character.background` widened `varchar(255)`→`text`.
+- Create characters any time from **`/characters`** (game-independent; `CharacterCreation.svelte` sets `user_id`, `game_id: null`; finalize shows an inline summary — the old `<Character>` preview was hardcoded "Helm: Alex").
+- **`/games`:** Create seats you as **GM** (`create_game_with_gm`, auto-generates an invite code shown next to GM games); **Join by code** brings a character (`join_game_by_code`).
+- Membership = `player` seat (user, game, role). `/player` is gated on **having a character here**; `/gm` on **being the GM**; each shows a cross "⇄ switch view" link (a GM may add their own character to play). DataStore helpers: `create_game_with_gm`, `load_my_characters`, `join_game_by_code`, `assign_character_to_game`, `remove_character_from_game`, `_generate_invite_code`.
+
+**KNOWN ISSUE — pick up next session: character skills have no default values.** A newly created character's skills all show **level 0** — the `*_success_checks` columns default to 0 and nothing seeds starting values (core-skill selections / subclass skills don't grant a baseline). Decide the intended starting values and seed them at creation. Look at `src/lib/data/createCharacter.js` (the success-checks→level model), the creation wizard's core-skill handling, and the `*_success_checks` columns.
+
 ### Source design docs (READ THESE FIRST — they are the spec)
 - `docs/Architecture/Mockups/PLAYER_CHECK_UX.md` — the design spec & rationale
   (the *why*, including rejected alternatives; treat its constraints as load-bearing).

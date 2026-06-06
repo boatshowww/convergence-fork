@@ -138,7 +138,7 @@ CREATE TABLE public."character" (
     id bigint NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     name character varying DEFAULT ''::character varying NOT NULL,
-    game_id bigint NOT NULL,
+    game_id bigint,
     ship_id bigint,
     planet_id bigint,
     is_npc boolean DEFAULT true NOT NULL,
@@ -186,7 +186,8 @@ CREATE TABLE public."character" (
     stealth_success_checks integer DEFAULT 0 NOT NULL,
     first_aid_success_checks integer DEFAULT 0 NOT NULL,
     evasion_success_checks integer DEFAULT 0 NOT NULL,
-    education_success_checks integer DEFAULT 0 NOT NULL
+    education_success_checks integer DEFAULT 0 NOT NULL,
+    user_id uuid
 );
 
 
@@ -212,7 +213,8 @@ CREATE TABLE public.game (
     id bigint NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     name character varying DEFAULT ''::character varying NOT NULL,
-    user_id uuid NOT NULL
+    user_id uuid NOT NULL,
+    invite_code text
 );
 
 
@@ -1121,6 +1123,13 @@ ALTER TABLE ONLY public.subclass_skill
 
 
 --
+-- Name: game_invite_code_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX game_invite_code_key ON public.game USING btree (invite_code);
+
+
+--
 -- Name: idx_error_log_created_at; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1475,6 +1484,14 @@ ALTER TABLE ONLY public."character"
 
 ALTER TABLE ONLY public."character"
     ADD CONSTRAINT character_subclass_id_fkey FOREIGN KEY (subclass_id) REFERENCES public.subclass(id);
+
+
+--
+-- Name: character character_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public."character"
+    ADD CONSTRAINT character_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id);
 
 
 --

@@ -71,20 +71,8 @@
       // Find our player in the list and set it as the singleton
       store.data.player = store.data.players.find((player) => player.user_id === store.user.id);
       
-      // Check our role - show character creation if we are a player and don't have a character
-      if (store.data.player.role.name === 'Player' && (!store.data.player.characters || store.data.player.characters.length === 0)) {
-        // Show character creation
-        debugger; //todo - test and remove
-        characterCreationRef.initiateCharacterCreation({
-          player_id: store.data.player.id
-        });
-      }
-
-      //TODO remove testing
-      characterCreationRef.initiateCharacterCreation({
-        player_id: store.data.player.id,
-        ship_id: 1
-      });
+      // Character creation now lives in the standalone /characters hub (user-owned,
+      // game-independent), not here. This legacy /game route is unlinked.
 
       // // TODO - Remove test message
       // store.realtimeChannels.broadcast.send({

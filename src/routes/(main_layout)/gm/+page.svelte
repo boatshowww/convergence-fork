@@ -11,9 +11,11 @@
   let status = $state('loading'); // loading | ready | error
   let statusMsg = $state('');
   let gameName = $state('');
+  let gameId = $state(null);
+  let hasCharacter = $state(false); // GM also has a character here -> offer player view
 
   onMount(() => {
-    const gameId = page.url.searchParams.get('game_id');
+    gameId = page.url.searchParams.get('game_id');
     if (!gameId) { status = 'error'; statusMsg = 'No game specified.'; return; }
 
     (async () => {
@@ -24,12 +26,13 @@
         await store.data.game.load_players();
 
         const seat = store.data.players.find((p) => p.user_id === store.user?.id);
-        if (!seat) { status = 'error'; statusMsg = 'You have no seat in this game.'; return; }
-        if (seat.role?.name !== 'Game Master') {
+        const isGM = seat?.role?.name === 'Game Master' || store.data.game?.user_id === store.user?.id;
+        if (!isGM) {
           status = 'error';
-          statusMsg = `Your role in this game is "${seat.role?.name ?? 'unknown'}". The GM view is for Game Master seats.`;
+          statusMsg = `Your role in this game is "${seat?.role?.name ?? 'unknown'}". The GM view is for the Game Master.`;
           return;
         }
+        hasCharacter = (seat?.characters ?? []).length > 0;
         gameName = store.data.game?.name ?? 'Game';
         status = 'ready';
       } catch (e) {
@@ -42,4 +45,4 @@
   });
 </script>
 
-<GmView {status} {statusMsg} {gameName} />
+<GmView {status} {statusMsg} {gameName} {gameId} {hasCharacter} />

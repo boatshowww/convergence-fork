@@ -193,6 +193,7 @@ export default class DataStore {
         { name: 'id', type: 'bigint', displayType: 'number', isPrimary: true },
         { name: 'name', type: 'varchar', displayType: 'string' },
         { name: 'game_id', type: 'bigint', displayType: 'number' },
+        { name: 'user_id', type: 'uuid', displayType: 'string' },
         { name: 'player_id', type: 'bigint', displayType: 'number' },
         { name: 'ship_id', type: 'bigint', displayType: 'number' },
         { name: 'planet_id', type: 'bigint', displayType: 'number' },
@@ -859,7 +860,7 @@ export default class DataStore {
       data = result.data;
       let error = result.error;
 
-      if(error) throw new Error(error.error.message);
+      if (error) throw new Error(error.message || error.error?.message || JSON.stringify(error));
 
       for (const [i, item] of data.entries()) {
         data[i] = this.updateData(table, item);
@@ -878,6 +879,76 @@ export default class DataStore {
   async createOne (table, insertData) {
     let data = await this.createMany(table, [insertData]);
     return data[0];
+  }
+
+  // ===== Game membership & character ownership helpers =====
+  // role_id: 1 = Game Master, 2 = Player
+
+  /**
+   * Create a game and seat the creator as its Game Master.
+   * @param {string} name
+   * @returns {Promise<object>} the created game row
+   */
+  /** Generate a short, shareable invite code (8 lowercase alphanumerics). */
+  _generate_invite_code() {
+    return Math.random().toString(36).slice(2, 10).padEnd(8, '0');
+  }
+
+  async create_game_with_gm(name) {
+    const game = await this.create_game({ name, user_id: this.user.id, invite_code: this._generate_invite_code() });
+    await this.create_player({ game_id: game.id, user_id: this.user.id, role_id: 1 });
+    return game;
+  }
+
+  /**
+   * Load the current user's owned characters, each with its current game (if any).
+   * Characters are user-owned and game-independent; `game_id` is the single game a
+   * character is currently in (null = available to assign).
+   * @returns {Promise<Array>}
+   */
+  async load_my_characters() {
+    const { data, error } = await this.supabase
+      .from('character')
+      .select('*, game:game_id(id, name)')
+      .eq('user_id', this.user.id)
+      .order('created_at', { ascending: true });
+    if (error) { logger.error('store', 'load_my_characters failed', error); return []; }
+    return data ?? [];
+  }
+
+  /** Find (or create) the current user's seat in a game. @returns {Promise<number>} seat id */
+  async _ensure_seat(gameId, roleId = 2) {
+    const existing = await this.supabase
+      .from('player').select('id').eq('game_id', gameId).eq('user_id', this.user.id).maybeSingle();
+    if (existing.data?.id) return existing.data.id;
+    const seat = await this.create_player({ game_id: gameId, user_id: this.user.id, role_id: roleId });
+    return seat.id;
+  }
+
+  /**
+   * Join a game by its invite code, bringing one of the user's characters.
+   * Creates a Player seat (if needed) and assigns the character to the game.
+   * @returns {Promise<object>} the joined game row
+   */
+  async join_game_by_code(code, characterId) {
+    const { data: game, error } = await this.supabase
+      .from('game').select('id, name').eq('invite_code', (code ?? '').trim()).maybeSingle();
+    if (error) throw new Error('Could not look up that invite code.');
+    if (!game) throw new Error('No game found for that invite code.');
+    const seatId = await this._ensure_seat(game.id, 2);
+    await this.supabase.from('character').update({ game_id: game.id, player_id: seatId }).eq('id', characterId);
+    return game;
+  }
+
+  /** Assign one of the user's characters to a game they're already in (ensures a seat). */
+  async assign_character_to_game(characterId, gameId) {
+    const seatId = await this._ensure_seat(gameId, 2);
+    await this.supabase.from('character').update({ game_id: gameId, player_id: seatId }).eq('id', characterId);
+  }
+
+  /** Remove a character from its current game (returns it to the menu pool). */
+  async remove_character_from_game(characterId) {
+    await this.supabase.from('character').update({ game_id: null, player_id: null }).eq('id', characterId);
   }
 
   async loadMany (table, queryModifier, isSingleton = false) {

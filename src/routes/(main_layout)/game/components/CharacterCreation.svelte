@@ -1,7 +1,6 @@
 <script>
   // Components
   import Modal from '@components/Modal.svelte';
-  import Character from './Character.svelte';
   // Styles
   import '@styles/app.css'
   // Utils
@@ -11,9 +10,12 @@
   import logger from '@utils/logger';
 
   const store = getContext('store');
+  let { onCreated = () => {} } = $props();
 
   let character = $state({});
   let loading = $state(false);
+  let createError = $state('');
+  let creating = $state(false);
   let modalRef;
 
   export async function initiateCharacterCreation(char = {}) {
@@ -23,7 +25,8 @@
     character = {
       name: '',
       background: '',
-      game_id: store.data.game.id,
+      user_id: store.user.id,
+      game_id: null,
       is_npc: false,
       is_alive: true,
       planet_id: null,
@@ -164,22 +167,30 @@
   }
 
   async function handleFinalize() {
-    logger.debug('app', 'character', $state.snapshot(character));
-    debugger;
-    // Create the character
-    let createdCharacter = await store.create_character(character);
+    createError = '';
+    creating = true;
+    try {
+      // Insert a plain snapshot (not the $state proxy)
+      const payload = $state.snapshot(character);
+      logger.debug('app', 'creating character', payload);
+      const createdCharacter = await store.create_character(payload);
 
-    // Add the sub class abilities
-    let abilityPromises = [];
-    for (let ability of selectedSubclass.abilities) {
-      abilityPromises.push(store.create_character_ability({character_id: createdCharacter.id, ability_id: ability.id}));
+      // Add the subclass abilities (derive the subclass defensively if needed)
+      const subclass = selectedSubclass ?? store.data.subclasses.find((s) => s.id === character.subclass_id);
+      const abilities = subclass?.abilities ?? [];
+      await Promise.all(
+        abilities.map((a) => store.create_character_ability({ character_id: createdCharacter.id, ability_id: a.id }))
+      );
+
+      // Close the modal and notify the host (e.g. to refresh a character list)
+      modalRef.close();
+      onCreated(createdCharacter);
+    } catch (e) {
+      logger.error('app', 'character creation failed', e);
+      createError = e?.message ?? String(e);
+    } finally {
+      creating = false;
     }
-
-    // Wait for all the abilities to be added
-    await Promise.all(abilityPromises);
-
-    // Close the modal
-    modalRef.close();
   }
 
   async function handleGenerateNameAndBackground() {
@@ -468,10 +479,26 @@
     {/if}
     {#if currentPanel === 'finalize'}
       <div class="creation-panel" transition:slide onoutroend={handleOutroEnd}>
-        <Character {character} />
+        <div class="finalize-summary">
+          <h3>{character.name || 'Unnamed'}</h3>
+          <p class="finalize-sub">
+            {selectedRace?.name ?? ''}{selectedClass ? ` · ${selectedClass.name}` : ''}{selectedSubclass ? ` / ${selectedSubclass.name}` : ''}
+          </p>
+          {#if character.background}<p class="finalize-bg">{character.background}</p>{/if}
+          <div class="finalize-stats">
+            <span>INT {character.intelligence}</span><span>DEX {character.dexterity}</span>
+            <span>STR {character.strength}</span><span>CHA {character.charisma}</span>
+            <span>INTU {character.intuition}</span><span>LUCK {character.luck}</span>
+            <span>CON {character.constitution}</span>
+          </div>
+          {#if selectedSubclass?.abilities?.length}
+            <p class="finalize-sub">Abilities: {selectedSubclass.abilities.map((a) => a.name).join(', ')}</p>
+          {/if}
+        </div>
+        {#if createError}<div class="error-message">Couldn't create character: {createError}</div>{/if}
         <div class="modal-actions">
-          <button class="btn" onclick={() => showPanel('name')}>Return to Name & Background Selection</button>
-          <button class="btn btn-primary" onclick={handleFinalize}>Create Character</button>
+          <button class="btn" onclick={() => showPanel('name')}>Return to Name &amp; Background Selection</button>
+          <button class="btn btn-primary" onclick={handleFinalize} disabled={creating}>{creating ? 'Creating…' : 'Create Character'}</button>
         </div>
       </div>
     {/if}
@@ -489,6 +516,11 @@
     display: flex;
     flex-direction: column;
   }
+  .finalize-summary { padding: 8px 4px 16px; }
+  .finalize-summary h3 { font-size: 1.6rem; color: #f5f5f5; margin-bottom: 2px; }
+  .finalize-sub { color: #8aa; font-size: 0.95rem; margin: 4px 0; }
+  .finalize-bg { color: #bbb; font-style: italic; margin: 8px 0; line-height: 1.5; }
+  .finalize-stats { display: flex; flex-wrap: wrap; gap: 8px 16px; margin-top: 10px; font-size: 0.95rem; color: #cfe6ec; }
 
   .creation-panel {
     display: flex;
