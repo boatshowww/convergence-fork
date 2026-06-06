@@ -160,6 +160,8 @@ actions** because they are economically opposite. Same verb, very different weig
 ### 5a. Cosmic re-roll — a *funded*, powerful second attempt
 - **Trigger to obtain:** the background luck d30 hits 30 (with luck stat added). This is rare by
   construction → a "cosmic moment" → grants a **cosmic token**.
+- **Cap:** a player holds **at most 2 cosmic tokens**. Earning one while already at 2 has no
+  effect (tokens do not stack beyond the cap).
 - **Cost:** spends one token.
 - **Power:** **keep the highest of the two rolls.** The player can only improve or hold, never
   lose ground. This is intentional — it should feel *very powerful* because it's rarely earned.

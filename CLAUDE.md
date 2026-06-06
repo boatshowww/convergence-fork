@@ -96,8 +96,8 @@ sent to GM — teal) from **Check** (committed, sent to GM, held until narrated 
 The game holds **secret per-skill DCs the player never sees**; a committed roll enters a
 **PENDING** state and the player learns the outcome only as **GM-authored narrative
 bands** (No-read / Partial / Success / Critical) *after the GM narrates* — never as bare
-pass/fail. A rare **cosmic token** (earned when the background luck d30 hits 30) allows a
-**keep-highest** re-roll during the pending window. Re-rolling a skill that is already
+pass/fail. A rare **cosmic token** (earned when the background luck d30 hits 30, **max 2 held**)
+allows a **keep-highest** re-roll during the pending window. Re-rolling a skill that is already
 pending **ejects it from the resolution queue entirely** (anti-shopping), demoting it to a
 just-roll. One pending check per skill. **Gold = "this counts / cosmic"; teal = "quiet /
 pending."**

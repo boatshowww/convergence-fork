@@ -25,6 +25,9 @@ const BANDS = [
   { min: 0, cls: 'band-fail', label: 'No read', text: "A grey box. Heavy. Humming. It tells you nothing it doesn't want to." },
 ];
 
+/** Game rule: a player can hold at most this many cosmic tokens (no stacking beyond the cap). */
+export const MAX_COSMIC_TOKENS = 2;
+
 /** Skills the GM flags on the staged prompt (their secret per-skill DCs are not modeled in this slice). */
 const PROMPT_SKILLS = ['Intuition', 'Education', 'Hacking'];
 
@@ -199,5 +202,5 @@ export class PlayerCheck {
     delete this.pending[name];
   }
 
-  grantToken() { this.tokens += 1; }
+  grantToken() { this.tokens = Math.min(MAX_COSMIC_TOKENS, this.tokens + 1); }
 }
