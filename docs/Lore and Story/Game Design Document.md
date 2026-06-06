@@ -575,7 +575,7 @@ Tier 5: Once per full rest cycle, revive a downed crew member to full health and
 
 
 * Core worlder
-* Spack hick
+* Outworlder
 * Ship rat
 
 

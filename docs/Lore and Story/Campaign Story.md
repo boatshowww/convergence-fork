@@ -1,3 +1,4 @@
+
 # Working Narrative
 
 ## High Level Story Beats
@@ -15,6 +16,9 @@
   * Herds of Oekigae are massive floating blimp like creatures that are among the largest creatures in the known universe  
   * Massive predators hunt the Oekigae, and pose a substantial threat to individual craft  
   * The threats of space faring creatures slow the exploration of the web  
+  * Throughout the story of Convergence, there are rumors and stories of people making contact with new alien races through dreams.
+	  * These are often said to occur while traveling through slipspace, but are known to take place otherwise 
+	  * The nature of these contacts vary wildly, From wise entities offering guidance to cosmic, horrors, beckoning death
 * At the end of their quest the crew will possess the tree of life, only to find they have been deceived  
   * The tree of life has a twin that hides in its shadow, the tree of knowledge  
   * The tree of knowledge disguises itself and presents itself as the its twin to beguile the pursuers  
@@ -23,6 +27,12 @@
     * There are hints throughout the exploration of the new filament of psychic awakenings and unnatural abilities  
     * These were latent powers awakened by the passing of the tree of knowledge  
     * The interaction with the tree of knowledge sends a ripple effect through the nearby stars, starting an awakening of new psychic abilities across tens of thousands of sentient creatures
+* There are massive celestial beings made of plasma that guard the cosmic garden behind the wall. They warn the travelers that a war is coming that will turn the web to dust.
+	* Powerful figures within the three races have been building super weapons from energy gathered near Gargantua
+	* These activities have been causing pulses of dark energy to emanate from the black hole, causing destruction, destruction in chaos
+	* Unbeknownst to them a dark cosmic figure is trapped within the black hole and has been guiding them to weaken his chains so that he can escape
+	* The war begins when he begins to break free and the plasmas that were previously beyond the wall invade Conway‘s Web
+	* The Allied races do not fully understand what is going on and view the invasion as a threat to their sovereign territory and resources, and go to war against the plasmids
 
 
 
