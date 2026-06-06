@@ -1,0 +1,642 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Convergence — Player Interface</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Spectral:ital,wght@0,400;0,500;0,600;1,400&display=swap');
+
+:root{
+  --void:#070d12;
+  --void-2:#0b141c;
+  --panel:#0e1a24;
+  --panel-2:#12222e;
+  --edge:#1d3644;
+  --edge-bright:#2b5468;
+  --teal:#3fd0c9;
+  --teal-dim:#1f6f74;
+  --gold:#e8b667;
+  --gold-bright:#ffd089;
+  --ink:#cfe6ec;
+  --ink-dim:#6f8d97;
+  --ink-faint:#456069;
+  --crit:#ffe08a;
+  --fail:#d05a4f;
+  --glow-teal:0 0 24px rgba(63,208,201,.35);
+  --glow-gold:0 0 28px rgba(232,182,103,.45);
+}
+
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  background:
+    radial-gradient(ellipse 60% 50% at 50% 42%, rgba(34,90,96,.22), transparent 60%),
+    radial-gradient(ellipse 120% 80% at 30% 0%, rgba(40,70,90,.18), transparent 55%),
+    radial-gradient(ellipse 120% 80% at 80% 100%, rgba(50,80,70,.14), transparent 55%),
+    var(--void);
+  color:var(--ink);
+  font-family:'Spectral',serif;
+  overflow:hidden;
+}
+/* subtle cosmic filament texture */
+body::before{
+  content:"";position:fixed;inset:0;pointer-events:none;z-index:0;
+  background:
+    radial-gradient(2px 2px at 20% 30%, rgba(180,220,225,.5), transparent),
+    radial-gradient(1px 1px at 70% 60%, rgba(180,220,225,.4), transparent),
+    radial-gradient(1px 1px at 40% 80%, rgba(180,220,225,.35), transparent),
+    radial-gradient(1.5px 1.5px at 85% 20%, rgba(180,220,225,.4), transparent),
+    radial-gradient(1px 1px at 55% 15%, rgba(180,220,225,.3), transparent);
+  opacity:.6;
+}
+
+.app{
+  position:relative;z-index:1;
+  height:100vh;
+  display:grid;
+  grid-template-columns:300px 1fr 360px;
+  gap:1px;
+  background:var(--edge);
+}
+
+.pane{background:var(--panel);overflow:hidden;display:flex;flex-direction:column;min-height:0}
+.pane-head{
+  padding:14px 16px 12px;border-bottom:1px solid var(--edge);
+  display:flex;align-items:center;justify-content:space-between;
+  background:linear-gradient(180deg, var(--panel-2), var(--panel));
+}
+.pane-title{
+  font-family:'Chakra Petch',sans-serif;font-weight:600;font-size:11px;
+  letter-spacing:.22em;text-transform:uppercase;color:var(--ink-dim);
+}
+
+/* ============ LEFT: CHARACTER ============ */
+.char-id{padding:16px}
+.char-name{font-family:'Chakra Petch',sans-serif;font-weight:700;font-size:20px;letter-spacing:.04em;color:var(--ink)}
+.char-sub{font-size:13px;color:var(--ink-dim);font-style:italic;margin-top:2px}
+.char-meta{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}
+.tag{font-family:'Chakra Petch',sans-serif;font-size:9px;letter-spacing:.14em;text-transform:uppercase;
+  padding:3px 8px;border:1px solid var(--edge-bright);border-radius:2px;color:var(--teal);background:rgba(63,208,201,.06)}
+
+.stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--edge);margin:0 16px;border:1px solid var(--edge)}
+.stat{background:var(--panel-2);padding:8px 4px;text-align:center}
+.stat-v{font-family:'Chakra Petch',sans-serif;font-weight:700;font-size:18px;color:var(--ink)}
+.stat-l{font-size:8px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-faint);font-family:'Chakra Petch',sans-serif;margin-top:2px}
+.stat.luck .stat-v{color:var(--gold)}
+
+.skills-head{padding:18px 16px 8px;font-family:'Chakra Petch',sans-serif;font-size:10px;
+  letter-spacing:.2em;text-transform:uppercase;color:var(--ink-faint)}
+.skills{flex:1;overflow-y:auto;padding:0 12px 16px}
+.skills::-webkit-scrollbar{width:6px}
+.skills::-webkit-scrollbar-thumb{background:var(--edge-bright);border-radius:3px}
+
+.skill{
+  display:flex;align-items:center;gap:10px;
+  padding:9px 12px;margin:3px 0;border-radius:3px;cursor:pointer;
+  border:1px solid transparent;position:relative;
+  transition:background .15s, border-color .15s, transform .08s;
+}
+.skill:hover{background:var(--panel-2);border-color:var(--edge)}
+.skill:active{transform:translateX(2px)}
+.skill-lv{
+  font-family:'Chakra Petch',sans-serif;font-weight:700;font-size:13px;
+  width:26px;height:26px;display:grid;place-items:center;flex-shrink:0;
+  border:1px solid var(--edge-bright);border-radius:3px;color:var(--teal);
+  background:rgba(63,208,201,.05);
+}
+.skill-name{flex:1;font-size:14px;color:var(--ink)}
+.skill-stat{font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint);font-family:'Chakra Petch',sans-serif}
+
+/* highlighted when GM prompts */
+.skill.flagged{
+  border-color:var(--gold);background:rgba(232,182,103,.08);
+  box-shadow:inset 0 0 16px rgba(232,182,103,.12);
+  animation:flagpulse 2s ease-in-out infinite;
+}
+@keyframes flagpulse{0%,100%{box-shadow:inset 0 0 16px rgba(232,182,103,.1)}50%{box-shadow:inset 0 0 22px rgba(232,182,103,.22)}}
+.skill.flagged .skill-lv{border-color:var(--gold);color:var(--gold);background:rgba(232,182,103,.08)}
+.skill.pending-mark::after{
+  content:"";position:absolute;right:10px;width:7px;height:7px;border-radius:50%;
+  background:var(--teal);box-shadow:var(--glow-teal);animation:breathe 1.6s ease-in-out infinite;
+}
+@keyframes breathe{0%,100%{opacity:.4;transform:scale(.85)}50%{opacity:1;transform:scale(1.15)}}
+
+/* ============ CENTER: MAP ============ */
+.map{flex:1;position:relative;display:grid;place-items:center;overflow:hidden;
+  background:radial-gradient(circle at 50% 50%, rgba(20,40,52,.5), var(--void) 70%)}
+.blackhole{position:relative;width:300px;height:300px;display:grid;place-items:center}
+.bh-disk{
+  position:absolute;width:300px;height:120px;border-radius:50%;
+  background:conic-gradient(from 0deg, rgba(63,208,201,.0), rgba(63,208,201,.5), rgba(232,182,103,.7), rgba(63,208,201,.5), rgba(63,208,201,0));
+  filter:blur(8px);transform:rotateX(72deg);animation:spin 24s linear infinite;
+}
+.bh-disk.two{width:220px;height:90px;filter:blur(4px);animation-duration:16s;opacity:.7}
+@keyframes spin{to{transform:rotateX(72deg) rotate(360deg)}}
+.bh-core{position:absolute;width:120px;height:120px;border-radius:50%;background:#02060a;
+  box-shadow:0 0 60px 10px rgba(0,0,0,.9), inset 0 0 30px rgba(63,208,201,.15)}
+.map-label{position:absolute;bottom:24px;left:24px;font-family:'Chakra Petch',sans-serif}
+.map-label .ml-1{font-size:10px;letter-spacing:.24em;text-transform:uppercase;color:var(--ink-faint)}
+.map-label .ml-2{font-size:18px;letter-spacing:.06em;color:var(--ink);margin-top:2px}
+.map-node{
+  position:absolute;padding:7px 11px;border:1px solid var(--edge-bright);border-radius:3px;
+  background:rgba(14,26,36,.85);cursor:pointer;font-family:'Chakra Petch',sans-serif;font-size:11px;
+  letter-spacing:.06em;color:var(--ink-dim);transition:.15s;backdrop-filter:blur(4px);
+}
+.map-node:hover{border-color:var(--gold);color:var(--gold);box-shadow:var(--glow-gold)}
+.map-node.n1{top:22%;left:28%}
+.map-node.n2{top:64%;left:62%}
+.map-node .dot{display:inline-block;width:5px;height:5px;border-radius:50%;background:var(--teal);margin-right:6px;vertical-align:middle}
+
+/* ============ RIGHT: CHAT / TRAY ============ */
+.right{display:flex;flex-direction:column}
+.mode-bar{padding:12px 14px;border-bottom:1px solid var(--edge);background:var(--panel-2)}
+.mode-label{font-family:'Chakra Petch',sans-serif;font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:var(--ink-faint);margin-bottom:8px}
+.toggle{
+  display:flex;background:var(--void-2);border:1px solid var(--edge);border-radius:4px;padding:3px;position:relative;cursor:pointer;
+}
+.toggle-slider{
+  position:absolute;top:3px;bottom:3px;left:3px;width:calc(50% - 3px);border-radius:3px;
+  transition:transform .28s cubic-bezier(.65,0,.35,1), background .28s, box-shadow .28s;
+  background:linear-gradient(180deg, var(--teal-dim), #134347);box-shadow:var(--glow-teal);
+}
+.toggle.check .toggle-slider{transform:translateX(100%);background:linear-gradient(180deg, var(--gold), #b07e2e);box-shadow:var(--glow-gold)}
+.toggle-opt{
+  flex:1;text-align:center;padding:9px 8px;position:relative;z-index:1;
+  font-family:'Chakra Petch',sans-serif;font-weight:600;font-size:11px;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--ink-dim);transition:color .2s;
+}
+.toggle:not(.check) .toggle-opt.just{color:#04141a}
+.toggle.check .toggle-opt.chk{color:#1a1206}
+.mode-hint{font-size:12px;color:var(--ink-dim);font-style:italic;margin-top:8px;min-height:32px;line-height:1.35}
+.mode-hint b{color:var(--gold);font-style:normal;font-family:'Chakra Petch',sans-serif;font-weight:500;font-size:11px;letter-spacing:.05em}
+.mode-hint.just b{color:var(--teal)}
+
+.stream{flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:10px}
+.stream::-webkit-scrollbar{width:6px}
+.stream::-webkit-scrollbar-thumb{background:var(--edge-bright);border-radius:3px}
+
+.tray-divider{font-family:'Chakra Petch',sans-serif;font-size:9px;letter-spacing:.2em;text-transform:uppercase;
+  color:var(--ink-faint);padding:4px 2px;border-bottom:1px solid var(--edge);display:flex;justify-content:space-between}
+
+/* GM narration / fiction */
+.fiction{font-size:14px;line-height:1.5;color:var(--ink);font-style:italic;
+  border-left:2px solid var(--edge-bright);padding:4px 0 4px 12px}
+.fiction .gm{font-style:normal;font-family:'Chakra Petch',sans-serif;font-size:9px;letter-spacing:.18em;
+  text-transform:uppercase;color:var(--teal);display:block;margin-bottom:5px}
+
+/* prompt card (GM requested check) */
+.card{
+  border:1px solid var(--edge-bright);border-radius:5px;background:linear-gradient(180deg, var(--panel-2), var(--panel));
+  overflow:hidden;animation:cardin .35s ease;
+}
+@keyframes cardin{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.card.gmreq{border-color:var(--gold);box-shadow:0 0 0 1px rgba(232,182,103,.15), 0 8px 24px rgba(0,0,0,.4)}
+.card-top{padding:10px 12px;border-bottom:1px solid var(--edge);display:flex;align-items:center;justify-content:space-between}
+.card-kind{font-family:'Chakra Petch',sans-serif;font-size:9px;letter-spacing:.18em;text-transform:uppercase}
+.card.gmreq .card-kind{color:var(--gold)}
+.card-fic{padding:10px 12px;font-size:13px;line-height:1.45;font-style:italic;color:var(--ink)}
+.card-skills{padding:4px 12px 12px;display:flex;flex-wrap:wrap;gap:7px}
+.sbtn{
+  font-family:'Chakra Petch',sans-serif;font-size:12px;letter-spacing:.04em;
+  padding:8px 12px;border:1px solid var(--gold);border-radius:3px;cursor:pointer;
+  background:rgba(232,182,103,.08);color:var(--gold-bright);transition:.14s;
+}
+.sbtn:hover{background:rgba(232,182,103,.2);box-shadow:var(--glow-gold)}
+.sbtn:active{transform:scale(.96)}
+.sbtn.other{border-color:var(--edge-bright);color:var(--ink-dim);background:transparent}
+.sbtn.other:hover{border-color:var(--ink-dim);background:var(--panel-2);box-shadow:none}
+
+/* rolled / pending */
+.roll{border:1px solid var(--edge);border-radius:5px;background:var(--panel-2);overflow:hidden}
+.roll.pending{border-color:var(--teal-dim);box-shadow:0 0 0 1px rgba(63,208,201,.12)}
+.roll.unevaluated{opacity:.55;border-style:dashed}
+.roll-top{padding:9px 12px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--edge)}
+.roll-skill{font-family:'Chakra Petch',sans-serif;font-size:13px;letter-spacing:.04em;color:var(--ink)}
+.roll-state{font-family:'Chakra Petch',sans-serif;font-size:9px;letter-spacing:.16em;text-transform:uppercase}
+.roll-state.pending{color:var(--teal)}
+.roll-state.uneval{color:var(--ink-faint)}
+.roll-state.resolved{color:var(--gold)}
+
+.dice{padding:14px 12px;display:flex;align-items:center;gap:14px}
+.d15{position:relative;width:64px;height:64px;flex-shrink:0;display:grid;place-items:center}
+.d15-shape{position:absolute;inset:0;background:linear-gradient(135deg, var(--panel), var(--void-2));
+  border:1px solid var(--edge-bright);transform:rotate(45deg);border-radius:8px}
+.d15.crit .d15-shape{border-color:var(--crit);box-shadow:0 0 20px rgba(255,224,138,.5)}
+.d15.fail .d15-shape{border-color:var(--fail);box-shadow:0 0 18px rgba(208,90,79,.4)}
+.d15-num{position:relative;font-family:'Chakra Petch',sans-serif;font-weight:700;font-size:26px;color:var(--ink)}
+.d15.crit .d15-num{color:var(--crit)}
+.d15.fail .d15-num{color:var(--fail)}
+.dice-info{flex:1}
+.dice-total{font-family:'Chakra Petch',sans-serif;font-size:13px;color:var(--ink-dim);letter-spacing:.04em}
+.dice-total b{color:var(--ink);font-size:15px}
+.dice-chain{font-size:11px;color:var(--gold);margin-top:3px;font-family:'Chakra Petch',sans-serif;letter-spacing:.03em}
+.luck{display:flex;align-items:center;gap:7px;margin-top:7px}
+.luck-die{width:18px;height:18px;border-radius:50%;border:1px solid var(--edge-bright);display:grid;place-items:center;
+  font-family:'Chakra Petch',sans-serif;font-size:9px;color:var(--ink-faint)}
+.luck.cosmic .luck-die{border-color:var(--gold);color:var(--gold);box-shadow:var(--glow-gold);animation:breathe 1.4s infinite}
+.luck-txt{font-size:10px;color:var(--ink-faint);letter-spacing:.08em;font-family:'Chakra Petch',sans-serif}
+.luck.cosmic .luck-txt{color:var(--gold)}
+
+.roll-actions{padding:0 12px 12px;display:flex;gap:8px;flex-wrap:wrap}
+.abtn{font-family:'Chakra Petch',sans-serif;font-size:10px;letter-spacing:.1em;text-transform:uppercase;
+  padding:8px 12px;border-radius:3px;cursor:pointer;transition:.14s;flex:1;text-align:center}
+.abtn.cosmic{border:1px solid var(--gold);background:linear-gradient(180deg, rgba(232,182,103,.18), rgba(232,182,103,.06));
+  color:var(--gold-bright);position:relative}
+.abtn.cosmic:hover{box-shadow:var(--glow-gold);background:rgba(232,182,103,.28)}
+.abtn.cosmic::before{content:"✦";margin-right:5px}
+.abtn.discard{border:1px solid var(--edge);background:transparent;color:var(--ink-faint)}
+.abtn.discard:hover{border-color:var(--fail);color:var(--fail)}
+.abtn:active{transform:scale(.97)}
+.pending-note{font-size:11px;color:var(--ink-faint);font-style:italic;padding:0 12px 12px;line-height:1.4}
+
+.resolved-fic{padding:0 12px 12px}
+.resolved-band{font-family:'Chakra Petch',sans-serif;font-size:10px;letter-spacing:.14em;text-transform:uppercase;
+  margin:2px 12px 6px;display:inline-block;padding:3px 9px;border-radius:2px}
+.band-crit{color:var(--crit);border:1px solid var(--crit);background:rgba(255,224,138,.08)}
+.band-success{color:var(--teal);border:1px solid var(--teal-dim);background:rgba(63,208,201,.08)}
+.band-partial{color:var(--gold);border:1px solid var(--gold);background:rgba(232,182,103,.08)}
+.band-fail{color:var(--fail);border:1px solid var(--fail);background:rgba(208,90,79,.08)}
+
+/* cosmic token dock */
+.token-dock{margin:10px 16px 0;padding:9px 12px;border:1px solid var(--gold);border-radius:4px;
+  background:rgba(232,182,103,.06);display:flex;align-items:center;gap:9px}
+.token-dock.empty{border-color:var(--edge);background:transparent;opacity:.5}
+.token-star{font-size:16px;color:var(--gold)}
+.token-dock.empty .token-star{color:var(--ink-faint)}
+.token-txt{font-family:'Chakra Petch',sans-serif;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--gold)}
+.token-dock.empty .token-txt{color:var(--ink-faint)}
+.token-n{margin-left:auto;font-family:'Chakra Petch',sans-serif;font-weight:700;font-size:16px;color:var(--gold)}
+.token-dock.empty .token-n{color:var(--ink-faint)}
+
+/* confirm overlay */
+.scrim{position:fixed;inset:0;background:rgba(3,7,11,.78);display:none;place-items:center;z-index:50;backdrop-filter:blur(3px)}
+.scrim.on{display:grid;animation:fadein .2s}
+@keyframes fadein{from{opacity:0}to{opacity:1}}
+.dialog{width:340px;border:1px solid var(--fail);border-radius:6px;background:var(--panel);overflow:hidden;
+  box-shadow:0 20px 60px rgba(0,0,0,.6)}
+.dialog-head{padding:14px 16px;border-bottom:1px solid var(--edge);font-family:'Chakra Petch',sans-serif;
+  font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--fail)}
+.dialog-body{padding:16px;font-size:14px;line-height:1.5;color:var(--ink)}
+.dialog-body b{color:var(--gold);font-style:normal}
+.dialog-acts{padding:0 16px 16px;display:flex;gap:10px}
+.dbtn{flex:1;padding:11px;border-radius:3px;cursor:pointer;font-family:'Chakra Petch',sans-serif;
+  font-size:11px;letter-spacing:.1em;text-transform:uppercase;transition:.14s;text-align:center}
+.dbtn.keep{border:1px solid var(--teal-dim);background:rgba(63,208,201,.1);color:var(--teal)}
+.dbtn.keep:hover{background:rgba(63,208,201,.2)}
+.dbtn.proceed{border:1px solid var(--fail);background:transparent;color:var(--fail)}
+.dbtn.proceed:hover{background:rgba(208,90,79,.12)}
+
+/* GM sim controls */
+.simbar{position:fixed;bottom:0;left:0;right:0;z-index:40;background:rgba(7,13,18,.92);
+  border-top:1px solid var(--edge-bright);padding:8px 14px;display:flex;align-items:center;gap:10px;backdrop-filter:blur(6px)}
+.sim-label{font-family:'Chakra Petch',sans-serif;font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--gold);margin-right:4px}
+.simbtn{font-family:'Chakra Petch',sans-serif;font-size:10px;letter-spacing:.08em;text-transform:uppercase;
+  padding:7px 12px;border:1px solid var(--edge-bright);border-radius:3px;background:var(--panel-2);
+  color:var(--ink-dim);cursor:pointer;transition:.14s}
+.simbtn:hover{border-color:var(--gold);color:var(--gold)}
+.simbtn:active{transform:scale(.96)}
+.sim-note{font-size:11px;color:var(--ink-faint);font-style:italic;margin-left:auto}
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- LEFT -->
+  <section class="pane">
+    <div class="pane-head"><span class="pane-title">Crew Member</span><span class="pane-title" style="color:var(--teal)">●</span></div>
+    <div class="char-id">
+      <div class="char-name">Vesh Kaur</div>
+      <div class="char-sub">Human · Scoundrel / Moonlighter</div>
+      <div class="char-meta"><span class="tag">Ship Rat</span><span class="tag">Andromeda</span></div>
+    </div>
+    <div class="stats-row">
+      <div class="stat"><div class="stat-v">6</div><div class="stat-l">Int</div></div>
+      <div class="stat"><div class="stat-v">7</div><div class="stat-l">Dex</div></div>
+      <div class="stat"><div class="stat-v">5</div><div class="stat-l">Str</div></div>
+      <div class="stat"><div class="stat-v">8</div><div class="stat-l">Cha</div></div>
+      <div class="stat"><div class="stat-v">6</div><div class="stat-l">Int·u</div></div>
+      <div class="stat"><div class="stat-v">5</div><div class="stat-l">Con</div></div>
+      <div class="stat luck"><div class="stat-v">3</div><div class="stat-l">Luck</div></div>
+      <div class="stat"><div class="stat-v">5</div><div class="stat-l">Wis</div></div>
+    </div>
+    <div class="token-dock" id="tokenDock">
+      <span class="token-star">✦</span><span class="token-txt">Cosmic Token</span><span class="token-n" id="tokenN">1</span>
+    </div>
+    <div class="skills-head">Skills · tap to roll</div>
+    <div class="skills" id="skills"></div>
+  </section>
+
+  <!-- CENTER -->
+  <section class="pane">
+    <div class="pane-head"><span class="pane-title">Navi-Console</span><span class="pane-title" style="color:var(--ink-faint)">Hullusta · Refinery District</span></div>
+    <div class="map">
+      <div class="blackhole">
+        <div class="bh-disk"></div><div class="bh-disk two"></div><div class="bh-core"></div>
+      </div>
+      <div class="map-node n1" onclick="mapCheck('Perception')"><span class="dot"></span>Watcher in the crowd</div>
+      <div class="map-node n2" onclick="mapCheck('Intuition')"><span class="dot"></span>Sealed container</div>
+      <div class="map-label"><div class="ml-1">Aeterna Perditor</div><div class="ml-2">The Lodestone</div></div>
+    </div>
+  </section>
+
+  <!-- RIGHT -->
+  <section class="pane right">
+    <div class="pane-head"><span class="pane-title">Session Log</span><span class="pane-title" style="color:var(--ink-faint)">SE 1.331</span></div>
+    <div class="mode-bar">
+      <div class="mode-label">Roll Mode</div>
+      <div class="toggle" id="toggle" onclick="flipMode()">
+        <div class="toggle-slider"></div>
+        <div class="toggle-opt just">Just Roll</div>
+        <div class="toggle-opt chk">Check</div>
+      </div>
+      <div class="mode-hint just" id="modeHint">
+        <b>Just Roll</b> — throw the dice for the feel of it. Nothing is sent to the GM. Results don't count.
+      </div>
+    </div>
+    <div class="stream" id="stream">
+      <div class="fiction"><span class="gm">GM · Narration</span>The C'than slides a reinforced grey box across the table. "This goes to Virgil." It hums faintly — something inside is being kept very cold, and very alive.</div>
+    </div>
+  </section>
+</div>
+
+<!-- confirm dialog -->
+<div class="scrim" id="scrim">
+  <div class="dialog">
+    <div class="dialog-head" id="dlgHead">Discard pending result?</div>
+    <div class="dialog-body" id="dlgBody"></div>
+    <div class="dialog-acts">
+      <div class="dbtn keep" onclick="closeDlg()">Keep Waiting</div>
+      <div class="dbtn proceed" id="dlgProceed">Roll Anyway</div>
+    </div>
+  </div>
+</div>
+
+<!-- GM simulation bar -->
+<div class="simbar">
+  <span class="sim-label">GM Sim ▸</span>
+  <button class="simbtn" onclick="gmPrompt()">Stage a check (Intuition·Education·Hacking)</button>
+  <button class="simbtn" onclick="gmResolve()">Narrate &amp; resolve oldest pending</button>
+  <button class="simbtn" onclick="grantToken()">Grant cosmic token</button>
+  <span class="sim-note">— stand-ins for the GM's separate interface</span>
+</div>
+
+<script>
+const SKILLS=[
+  {name:'Persuasion',stat:'Cha',lv:6},{name:'Deception',stat:'Cha',lv:5},
+  {name:'Intuition',stat:'Int·u',lv:4},{name:'Bartering',stat:'Cha',lv:5},
+  {name:'Stealth',stat:'Dex',lv:4},{name:'Hacking',stat:'Int',lv:3},
+  {name:'Education',stat:'Int',lv:4},{name:'Perception',stat:'Int·u',lv:5},
+  {name:'Pistols',stat:'Dex',lv:3},{name:'First Aid',stat:'Int·u',lv:2},
+  {name:'Performance',stat:'Cha',lv:4},{name:'Evasion',stat:'Dex',lv:5},
+];
+
+let mode='just';          // 'just' | 'check'
+let tokens=1;
+let pending={};           // skillName -> card element (one per skill)
+let flagged=[];           // GM-flagged skills
+let cardSeq=0;
+
+const stream=document.getElementById('stream');
+const skillsEl=document.getElementById('skills');
+
+// build skill list
+SKILLS.forEach(s=>{
+  const el=document.createElement('div');
+  el.className='skill';el.dataset.skill=s.name;
+  el.innerHTML=`<div class="skill-lv">${s.lv}</div><div class="skill-name">${s.name}</div><div class="skill-stat">${s.stat}</div>`;
+  el.onclick=()=>tapSkill(s.name);
+  skillsEl.appendChild(el);
+});
+
+function flipMode(){
+  mode = mode==='just' ? 'check' : 'just';
+  const t=document.getElementById('toggle');
+  const h=document.getElementById('modeHint');
+  if(mode==='check'){
+    t.classList.add('check');
+    h.className='mode-hint';
+    h.innerHTML=`<b>Check</b> — a committed roll. Sent to the GM and held until they narrate the outcome. One per skill at a time.`;
+  }else{
+    t.classList.remove('check');
+    h.className='mode-hint just';
+    h.innerHTML=`<b>Just Roll</b> — throw the dice for the feel of it. Nothing is sent to the GM. Results don't count.`;
+  }
+}
+
+function rng(n){return Math.floor(Math.random()*n)+1;}
+function rollD15(){ // exploding crits
+  let total=0,chain=[],r;
+  do{r=rng(15);chain.push(r);total+=r;}while(r===15);
+  return {total,chain,crit:chain[0]===15,fail:chain[0]===1};
+}
+function rollLuck(luckStat){
+  const base=rng(30);const sum=Math.min(30,base+luckStat);
+  return {base,sum,cosmic:sum>=30};
+}
+
+function diceMarkup(roll,luck){
+  const cls=roll.crit?'crit':roll.fail?'fail':'';
+  const first=roll.chain[0];
+  let chainTxt='';
+  if(roll.chain.length>1){chainTxt=`<div class="dice-chain">✦ crit chain: ${roll.chain.join(' → ')} = ${roll.total}</div>`;}
+  const luckCls=luck.cosmic?'cosmic':'';
+  const luckTxt=luck.cosmic?'COSMIC MOMENT — luck reached 30':`luck die · ${luck.base}${luck.base!==luck.sum?` (+${luck.sum-luck.base})`:''}`;
+  return `<div class="dice">
+    <div class="d15 ${cls}"><div class="d15-shape"></div><div class="d15-num">${first}</div></div>
+    <div class="dice-info">
+      <div class="dice-total">total <b>${roll.total}</b>${roll.fail?' · critical fail':roll.crit?' · critical':''}</div>
+      ${chainTxt}
+      <div class="luck ${luckCls}"><div class="luck-die">d30</div><span class="luck-txt">${luckTxt}</span></div>
+    </div>
+  </div>`;
+}
+
+function tapSkill(name){
+  // if a CHECK for this skill is already pending → confirm discard
+  if(mode==='check' && pending[name]){
+    confirmDiscard(name);
+    return;
+  }
+  doRoll(name, mode);
+}
+
+function mapCheck(name){
+  // map nodes always initiate a real check, switching mode for clarity
+  if(mode!=='check') flipMode();
+  if(pending[name]){confirmDiscard(name);return;}
+  doRoll(name,'check');
+}
+
+function luckOf(name){return 3;} // Vesh's luck
+
+function doRoll(name, m){
+  const roll=rollD15();
+  const luck=rollLuck(luckOf(name));
+  if(luck.cosmic) grantToken(true);
+
+  if(m==='just'){
+    const el=document.createElement('div');
+    el.className='roll unevaluated';
+    el.innerHTML=`<div class="roll-top"><span class="roll-skill">${name}</span><span class="roll-state uneval">Unevaluated</span></div>
+      ${diceMarkup(roll,luck)}
+      <div class="pending-note">Thrown for the feel of it — not sent to the GM.</div>`;
+    push(el);
+    return;
+  }
+
+  // CHECK mode → pending
+  const id='c'+(++cardSeq);
+  const el=document.createElement('div');
+  el.className='roll pending';el.dataset.skill=name;el.id=id;
+  el.dataset.total=roll.total;
+  renderPending(el,name,roll,luck);
+  push(el);
+  pending[name]=el;
+  markSkillPending(name,true);
+}
+
+function renderPending(el,name,roll,luck){
+  let actions='';
+  if(tokens>0){
+    actions+=`<div class="abtn cosmic" onclick="cosmicReroll('${el.id}','${name}',${roll.total})">Cosmic Re-roll · keep highest</div>`;
+  }
+  actions+=`<div class="abtn discard" onclick="confirmDiscard('${name}')">Re-roll (discard)</div>`;
+  el.innerHTML=`<div class="roll-top"><span class="roll-skill">${name}</span><span class="roll-state pending">● With the GM</span></div>
+    ${diceMarkup(roll,luck)}
+    <div class="roll-actions">${actions}</div>
+    <div class="pending-note">Waiting for the GM to narrate the outcome. The cosmic window stays open until they do.</div>`;
+}
+
+function cosmicReroll(id,name,prevTotal){
+  if(tokens<=0)return;
+  tokens--;updateToken();
+  const el=document.getElementById(id);
+  if(!el)return;
+  const roll=rollD15();const luck=rollLuck(luckOf(name));
+  const best=Math.max(prevTotal,roll.total);
+  // show the new roll, claim the higher
+  el.dataset.total=best;
+  let actions=`<div class="abtn discard" onclick="confirmDiscard('${name}')">Re-roll (discard)</div>`;
+  el.innerHTML=`<div class="roll-top"><span class="roll-skill">${name}</span><span class="roll-state pending">● With the GM</span></div>
+    ${diceMarkup(roll,luck)}
+    <div class="dice-chain" style="padding:0 12px 4px;color:var(--gold)">✦ Cosmic re-roll: previous ${prevTotal} vs new ${roll.total} → keeping <b>${best}</b></div>
+    <div class="roll-actions">${actions}</div>
+    <div class="pending-note">Cosmos claimed. The higher of the two stands. Still awaiting the GM's word.</div>`;
+}
+
+let discardTarget=null;
+function confirmDiscard(name){
+  discardTarget=name;
+  const el=pending[name];
+  const total=el?el.dataset.total:'—';
+  document.getElementById('dlgBody').innerHTML=
+    `Your <b>${name}</b> roll (${total}) is still with the GM. Rolling again <b>removes it from the resolution queue entirely</b> — it will not be narrated or counted. You'll just be throwing dice.`;
+  document.getElementById('dlgProceed').onclick=()=>{
+    closeDlg();
+    // demote the pending card to unevaluated, eject from queue
+    if(pending[name]){
+      const c=pending[name];
+      c.className='roll unevaluated';
+      const st=c.querySelector('.roll-state');st.className='roll-state uneval';st.textContent='Ejected';
+      const acts=c.querySelector('.roll-actions');if(acts)acts.remove();
+      const note=c.querySelector('.pending-note');if(note)note.textContent='Removed from the GM\'s queue by re-rolling. This attempt no longer counts.';
+      delete pending[name];
+      markSkillPending(name,false);
+    }
+    // now throw a fresh just-roll
+    doRoll(name,'just');
+  };
+  document.getElementById('scrim').classList.add('on');
+}
+function closeDlg(){document.getElementById('scrim').classList.remove('on');}
+
+function markSkillPending(name,on){
+  const sk=skillsEl.querySelector(`.skill[data-skill="${name}"]`);
+  if(sk)sk.classList.toggle('pending-mark',on);
+}
+
+function push(el){stream.appendChild(el);stream.scrollTop=stream.scrollHeight;}
+
+// ===== GM SIMULATION =====
+function gmPrompt(){
+  flagged=['Intuition','Education','Hacking'];
+  flagged.forEach(n=>{
+    const sk=skillsEl.querySelector(`.skill[data-skill="${n}"]`);
+    if(sk)sk.classList.add('flagged');
+  });
+  const card=document.createElement('div');
+  card.className='card gmreq';
+  card.innerHTML=`<div class="card-top"><span class="card-kind">✦ GM requests a check</span></div>
+    <div class="card-fic">You turn the box over. What can you tell about it? <span style="color:var(--ink-faint)">(different skills read it differently)</span></div>
+    <div class="card-skills">
+      <div class="sbtn" onclick="promptRoll('Intuition',this)">Intuition</div>
+      <div class="sbtn" onclick="promptRoll('Education',this)">Education</div>
+      <div class="sbtn" onclick="promptRoll('Hacking',this)">Hacking</div>
+      <div class="sbtn other" onclick="alert('Player\\'s full sheet stays available as \\'other checks\\' — GM adjudicates live.')">other…</div>
+    </div>`;
+  push(card);
+}
+function promptRoll(name,btn){
+  // GM-flagged → always a real check
+  if(pending[name]){confirmDiscard(name);return;}
+  // collapse the card's skill buttons (committed)
+  const card=btn.closest('.card');
+  const fic=card.querySelector('.card-fic');
+  card.querySelector('.card-skills').innerHTML=`<span style="font-family:'Chakra Petch';font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--teal)">▸ ${name} committed</span>`;
+  flagged.forEach(n=>{const sk=skillsEl.querySelector(`.skill[data-skill="${n}"]`);if(sk)sk.classList.remove('flagged');});
+  flagged=[];
+  doRoll(name,'check');
+}
+
+const BANDS=[
+  {min:21,band:'band-crit',label:'Critical',text:'You read it cold: a molecular-scale specimen container. Dormant cells — but the genetic signature is wrong. This is no ordinary cargo. A coded manifest pings against your augment: <i>Secunda</i>.'},
+  {min:16,band:'band-success',label:'Success',text:'A reinforced, refrigerated laboratory specimen container. Whatever\'s inside is being kept alive at a molecular scale.'},
+  {min:11,band:'band-partial',label:'Partial',text:'The box has its own power cell — it\'s maintaining some internal condition. Cold, sealed, deliberate. Beyond that, you can\'t crack its purpose.'},
+  {min:0,band:'band-fail',label:'No read',text:'A grey box. Heavy. Humming. It tells you nothing it doesn\'t want to.'},
+];
+function gmResolve(){
+  // resolve the oldest pending check
+  const names=Object.keys(pending);
+  if(names.length===0){
+    const f=document.createElement('div');f.className='fiction';
+    f.innerHTML=`<span class="gm">GM</span>Nothing is queued for resolution right now.`;push(f);return;
+  }
+  const name=names[0];
+  const el=pending[name];
+  const total=parseInt(el.dataset.total,10);
+  // close cosmic window first
+  const acts=el.querySelector('.roll-actions');if(acts)acts.remove();
+  const note=el.querySelector('.pending-note');if(note)note.remove();
+  const st=el.querySelector('.roll-state');st.className='roll-state resolved';st.textContent='Resolved';
+  el.className='roll';
+  // determine band (secret DCs live here; player never saw them)
+  const b=BANDS.find(x=>total>=x.min);
+  const fic=document.createElement('div');fic.className='fiction';
+  fic.innerHTML=`<span class="gm">GM · Narration</span><span class="resolved-band ${b.band}">${name} · ${b.label}</span>${b.text}`;
+  push(fic);
+  delete pending[name];
+  markSkillPending(name,false);
+}
+
+function grantToken(silent){
+  tokens++;updateToken();
+  // refresh any pending cards to show the cosmic option
+  Object.entries(pending).forEach(([name,el])=>{
+    if(!el.querySelector('.abtn.cosmic')){
+      const acts=el.querySelector('.roll-actions');
+      if(acts){
+        const total=el.dataset.total;
+        const b=document.createElement('div');b.className='abtn cosmic';b.textContent='Cosmic Re-roll · keep highest';
+        b.onclick=()=>cosmicReroll(el.id,name,parseInt(total,10));
+        acts.insertBefore(b,acts.firstChild);
+      }
+    }
+  });
+}
+function updateToken(){
+  document.getElementById('tokenN').textContent=tokens;
+  document.getElementById('tokenDock').classList.toggle('empty',tokens<=0);
+}
+</script>
+</body>
+</html>

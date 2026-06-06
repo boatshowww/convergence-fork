@@ -78,6 +78,139 @@ The DB tables modeled: `game, player, ship, planet, star_system,
 star_system_object, stat, race, class, subclass, skill, ability, subclass_skill,
 character, character_ability, class_skill, role`.
 
+## INITIATIVE: Player Check Interface (planning 2026-06-05)
+
+A new player-facing **skill-check interface**. This is the current feature focus.
+
+### Source design docs (READ THESE FIRST — they are the spec)
+- `docs/Architecture/Mockups/PLAYER_CHECK_UX.md` — the design spec & rationale
+  (the *why*, including rejected alternatives; treat its constraints as load-bearing).
+- `docs/Architecture/Mockups/player-interface.html` — a working clickable prototype
+  (vanilla HTML/CSS/JS) implementing everything in the spec. The "GM Sim" bar in it is
+  a stand-in for the GM's separate interface, not part of the player experience.
+
+### The design in one paragraph
+Players roll checks through a three-pane interface (character sheet · map · log). A
+persistent **mode toggle** distinguishes **Just Roll** (tactile, never counts, never
+sent to GM — teal) from **Check** (committed, sent to GM, held until narrated — gold).
+The game holds **secret per-skill DCs the player never sees**; a committed roll enters a
+**PENDING** state and the player learns the outcome only as **GM-authored narrative
+bands** (No-read / Partial / Success / Critical) *after the GM narrates* — never as bare
+pass/fail. A rare **cosmic token** (earned when the background luck d30 hits 30) allows a
+**keep-highest** re-roll during the pending window. Re-rolling a skill that is already
+pending **ejects it from the resolution queue entirely** (anti-shopping), demoting it to a
+just-roll. One pending check per skill. **Gold = "this counts / cosmic"; teal = "quiet /
+pending."**
+
+### Non-negotiable constraints (from the spec — do not "optimize" away)
+1. **Hidden DC.** The player never sees the target number. *(How we enforce it: see the
+   simplification decision below.)*
+2. **GM narrates first, always.** Die result and outcome are **decoupled in time** —
+   `PENDING` is a first-class, comfortable UI state, not a spinner. The pause **is** the
+   product (recreates the table rhythm: roll → slide die forward → look up at GM).
+3. **Never show bare SUCCESS/FAIL.** Only GM-authored narrative bands. (Per-skill DCs mean
+   two players can roll the same number and get different outcomes — bare pass/fail would
+   read as a bug.)
+4. **Two re-roll paths must look/behave clearly different:** cosmic (funded, keep-highest,
+   gold ✦) vs discard (unfunded, *ejects from queue*, faintly cautionary, guarded by a
+   confirm dialog whose safe default is "Keep Waiting").
+5. **Don't signal the easy skill** — multi-skill prompt buttons are visually equal weight.
+
+### Dice mechanics (from the GDD; prototype JS is the reference impl)
+- **d15:** 15 = critical success → **explode** (roll again & add, repeat); 1 = critical
+  failure (auto non-pass). Skill modifies via the `*_success_checks`→level model already in
+  `createCharacter.js`.
+- **Luck d30 (background, every CHECK):** 1–29 nothing; **30 (luck stat added to the roll)
+  → cosmic moment → free re-roll token.**
+
+### THE CORE COLLISION with current code
+`components/Check.svelte` + `components/checkRoller.js` do exactly what the design
+**forbids**: they compute pass/fail **on the client** (`Check.svelte` ~line 48:
+`displayResult = displayModified >= threshold`) and show bare **"SUCCESS!/FAILURE"**
+immediately (~line 114). For checks this is a **replacement**, not an extension. (The old
+roller may stay for generic/non-check rolls, or be retired later.)
+
+### DECISION 1 — Hidden-DC enforcement: keep it SIMPLE for now (2026-06-05, Scott)
+Enforce the hidden DC at the **UI level only** — the player interface simply does not
+render the DC. We explicitly **rejected** the heavier options (RLS-split secret tables,
+Postgres SECURITY DEFINER RPC, Supabase Edge Function) for now. Scott's call: *"If a player
+can inspect page source and find the answer, that's on them; worry about encryption/
+obfuscation later."* **Future hardening is a known, deferred task — not abandoned.**
+
+### DECISION 2 — First slice runs over BROADCAST ONLY, no schema change (2026-06-05, Scott)
+The first working slice drives the **entire check lifecycle over the existing per-game
+broadcast channel** (`game-broadcast:${gameId}`, see `subscribeRealtime`) with **NO new
+tables**. Rationale: fastest path to a clickable, real-multi-client UX with zero schema
+work, matching the "keep the codebase as simple as possible" directive.
+- **Trade-off (accepted):** nothing persists — a refresh loses in-flight checks. This is a
+  scaffold, not the destination.
+- **GM authority:** the **GM client holds the secret DCs/bands locally** and only
+  broadcasts player-facing data (fiction, flagged skills, mode). On resolve, the GM client
+  computes the band and broadcasts **only the band text**. (Conveniently, DCs never even hit
+  the wire this way — but that's a side effect, not a security guarantee.)
+- **Broadcast event shape (to define in impl):** roughly
+  `check:gate-staged {gateId, fiction, skills[], mode, targets}` ·
+  `check:attempt {attemptId, characterId, skill, mode, d15{total,chain,crit,fail}, luck{base,sum,cosmic}, state}` ·
+  `check:attempt-updated {attemptId, newTotal, kept}` (cosmic) ·
+  `check:attempt-ejected {attemptId}` (discard) ·
+  `check:resolved {attemptId, bandLabel, bandText}` · `check:token-granted {playerId}`.
+- **Lifecycle/tray/mode/re-roll logic** lives in component state (Svelte 5 runes), synced by
+  these events — port directly from the prototype's JS.
+
+### DECISION 3 — Build location: standalone `/player` route first (2026-06-05)
+Build in a **new `src/routes/(main_layout)/player/+page.svelte`** route, not inside the
+debug-scaffolded `game/+page.svelte` yet. Port the prototype's three panes to Svelte
+components, wire to broadcast incrementally. **The components are the durable asset; the
+route wrapper is disposable** — fold the components into the real 3-pane `game` layout once
+proven. Low risk to the working game page.
+
+### Prerequisites (because this initiative deliberately SKIPS character creation)
+- **Test character without the creation wizard.** Start with a lightweight mock character
+  object (mirror the prototype's skill list / `Vesh Kaur`) so the slice doesn't depend on a
+  DB character existing. Wire to a real seeded `character` row (via `createCharacter.js`)
+  as a follow-up. "Work backwards to the planned UX" = build the target player view first,
+  backfill the character/GM plumbing after.
+- **Minimal GM trigger.** A bare control (broadcast-driven) to stage a gate and
+  narrate/resolve — enough to drive the player UI. Real GM interface is out of scope here.
+
+### INTENDED FUTURE ARCHITECTURE (the migration target — do NOT lose this)
+When we outgrow the broadcast scaffold, promote the lifecycle to **real tables wired into
+the DataStore `tables` array with `postgres_changes` realtime** (filtered by `game_id`),
+exactly like every other table. **This is a SCHEMA CHANGE Scott applies in Studio — flag it
+explicitly when we get there.** Target shape (from PLAYER_CHECK_UX §9):
+```
+gate(id, game_id, fiction, resolution_mode[FIRST_SUCCESS|EVERYONE_ROLLS|BEST_RESULT],
+     allow_other_skills, targets, status[OPEN|RESOLVED|CLOSED])
+gate_skill(gate_id, skill_id, dc)          -- dc hidden by UI (see Decision 1)
+gate_band(gate_id, min_total, label, text) -- GM-authored narrative outcomes
+check_attempt(id, gate_id|null, character_id, skill_id, mode[JUST_ROLL|CHECK],
+              d15_total, d15_chain, luck_base, luck_sum, luck_cosmic,
+              state[ROLLING|PENDING|EJECTED|RESOLVED|UNEVALUATED],
+              cosmic_prev_total, cosmic_new_total, cosmic_kept,
+              resolved_band_label, resolved_band_text)
+```
+- **Resolution modes** (§7) drive shared-vs-personal cards: first-success (shared, closes
+  for all), everyone-rolls (personal copy per target), best-result (stays open, accrues).
+- **Just-rolls stay ephemeral** (broadcast/local only) even in the future model — they never
+  persist by design.
+- **Then** retire `Check.svelte` for checks; revisit hidden-DC hardening (Decision 1).
+
+### Open questions (from spec §10 — carry to playtest, don't pre-decide)
+1. Map clicks: auto-switch to Check, or respect current mode?
+2. Cosmic moment on a *just-roll*: grant a token or not? (Leaning: CHECK only.)
+3. GM prompts a skill that's already pending: block / queue / supersede?
+4. Unprompted roll with no GM-staged DC: raw result for GM to interpret, or a request the
+   GM must accept?
+5. Mode-misfire frequency — does the persistent toggle cause wrong-mode rolls often enough
+   to warrant a long-press accelerator?
+
+### Aesthetic (load-bearing color semantics, not decoration)
+Aeterna / cosmic-filament: deep teal-blue void, faint star texture, slowly-rotating
+accretion disk on the center map. **Teal** = quiet/pending/just-roll; **Gold** =
+committed/cosmic/"this counts" (reserve it); **Red** = critical-fail/destructive only.
+Fonts: `Chakra Petch` (HUD/labels) + `Spectral` (fiction/narration, italic). Spend
+animation budget on (a) dice + crit chain, (b) cosmic claim, (c) pending→narrated.
+
 ## DB schema tracking (ESTABLISHED 2026-05-29)
 
 **Goal (achieved):** capture the real schema in version control and define a
