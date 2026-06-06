@@ -1344,6 +1344,8 @@ During the Dark Matter War some adventurers fled the civilized filaments to seek
 
 The newly minted Confederation of Allied Races found this to be the perfect opportunity to release the pressure of competitive  exports and intergalactic immigration. The newest permanent E-Gate was created on the proverbial doorstep of Conway's web, as it would later come to be called.
 
+## Silver Baze
+Silver comes from the Core world of Tara with hard working civil servants for parents. She was a handful growing up and gave her well intentioned parents a lot of grief for the amount of love and attention they gave her. She always dreamed of becoming a pilot and applied herself in school so she could get in on a scholarship. While in the academy she was exposed to ideas and beliefs  that initially shocked her, but only hardened her resolve. She believes that government is an extension of the citizens, and that all races can be represented and protected equally. She is strongly against theft and injustice, but believes the laws are intended to protect the people. She's been known to cause her own chaos when she felt like authority did not reflect the best interests of the governed (or her own).
 
 
 
