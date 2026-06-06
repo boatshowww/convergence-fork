@@ -78,9 +78,41 @@ The DB tables modeled: `game, player, ship, planet, star_system,
 star_system_object, stat, race, class, subclass, skill, ability, subclass_skill,
 character, character_ability, class_skill, role`.
 
-## INITIATIVE: Player Check Interface (planning 2026-06-05)
+## INITIATIVE: Player Check Interface (IN PROGRESS)
 
-A new player-facing **skill-check interface**. This is the current feature focus.
+A player-facing **skill-check interface**. This is the current feature focus.
+
+### STATUS — where we are (updated 2026-06-06) — READ THIS FIRST
+Build sequence: prototype → local slice → real-data → role-aware routing → **broadcast (in progress)** → persistence.
+
+**DONE & committed on `main`:**
+- **Dice engine** `src/lib/dice.js` (+ `dice.test.js`, 12 tests): exploding d15, luck d30, `MAX_COSMIC_TOKENS = 2`.
+- **Player slice** `src/routes/(main_layout)/player/`:
+  - `+page.svelte` (host): with `?game_id=` it loads the game → finds your **Player** seat → feeds your real `character` into the sheet. No `game_id` → local **mock** sandbox (the GM Sim bar shows only in mock).
+  - `playerCheck.svelte.js` — local lifecycle controller (mode toggle, pending tray, cosmic/discard re-rolls, narrative bands, token cap). Still has local `gmStage/gmResolveOldest/grantToken` **sim** methods.
+  - `components/{CharacterSheet,StarMap,CheckLog,DiceDisplay}.svelte`. Log scrolls + smart auto-scroll (follows new entries only when pinned to bottom).
+- **Role-aware routing (Option A):** `/games` lists by **membership** (your player seats) with role badges → routes Player→`/player?game_id=`, GM→`/gm?game_id=`. New `/gm` route + `gm/GmView.svelte` (**scaffold**: stage control + pending-resolutions queue; guards to GM seats).
+- `DataStore.svelte.js`: `SIGNED_IN` redirect gated to neutral pages only (deep links no longer hijacked).
+
+**IN PROGRESS — Step 1 (broadcast wiring):**
+- ✅ Realtime broadcast **transport verified** on the self-hosted stack (two clients exchanged a `check:*` event on `game-broadcast:24`).
+- ✅ Shared helper `src/lib/check/net.js` — `makeCheckNet(store, onEvent) → { clientId, send, dispose }`. Sends on `store.realtimeChannels.broadcast`; receives via `store.on('game-event', …)` where **`event.args` is the raw supabase message** `{type,event,payload}`; ignores own `senderId`. **NOT yet wired into the controllers.**
+
+**NEXT STEPS (resume here):**
+1. **Finish broadcast wiring (step 1).**
+   - *Player* (`playerCheck.svelte.js` + `/player` host): give each pending attempt a global `attemptId`; on CHECK-commit / cosmic / discard call `net.send('check:attempt' | 'check:attempt-updated' | 'check:attempt-ejected', …)`; add receive handlers `applyGateStaged`, `applyResolved` (match by `attemptId`), token-granted (if `playerId === me`). Create `net` + `me{playerId,characterName}` when `status==='ready'`; hide the GM Sim bar in game mode.
+   - *GM*: build `gm/gmCheck.svelte.js` (holds the secret bands; `stage`→`check:gate-staged`; receive `check:attempt*`→pending queue; `resolve(attemptId)`→compute band→`check:resolved`; `grant(playerId)`→`check:token-granted`). Wire `GmView` + `makeCheckNet` in the `/gm` host; replace the scaffold/sim.
+   - Event shapes: see **DECISION 2** below. Verify with the two-browser test.
+2. **Step 3 — persist cosmic tokens (SCHEMA CHANGE Scott applies).** Proposed: `ALTER TABLE public.character ADD COLUMN cosmic_tokens smallint NOT NULL DEFAULT 0;` (cap of 2 still enforced in code). Flag explicitly + give Studio steps before wiring read/write.
+3. *(Later)* migrate off the broadcast scaffold to the persisted model (see INTENDED FUTURE ARCHITECTURE); retire `Check.svelte` for checks.
+
+**TEST DATA / INFRA (seeded in the live DB — DML only, NOT in git):**
+- Game **24 "Check Test"** (owned by the main account).
+- Seat **player 4** = `wilson.scott214@gmail.com` (main), role **Player**, character **12 "Vesh Kaur"** (stats + skill levels seeded).
+- Seat **player 5** = `wilson.scott214+test1@gmail.com`, role **Game Master**.
+- **Two-browser test:** main → `http://192.168.1.106:3000/player?game_id=24` · `+test1` → `…/gm?game_id=24`.
+- `role.id`: 1 = Game Master, 2 = Player. RLS is wide-open placeholder (`USING(true)`).
+- Headless Playwright works for the **mock** route only (authed routes have no session) — use two real browsers for multiplayer. Browser deps already installed.
 
 ### Source design docs (READ THESE FIRST — they are the spec)
 - `docs/Architecture/Mockups/PLAYER_CHECK_UX.md` — the design spec & rationale
@@ -148,7 +180,7 @@ work, matching the "keep the codebase as simple as possible" directive.
   broadcasts player-facing data (fiction, flagged skills, mode). On resolve, the GM client
   computes the band and broadcasts **only the band text**. (Conveniently, DCs never even hit
   the wire this way — but that's a side effect, not a security guarantee.)
-- **Broadcast event shape (to define in impl):** roughly
+- **Broadcast event shapes (the protocol; transport implemented in `src/lib/check/net.js`):** roughly
   `check:gate-staged {gateId, fiction, skills[], mode, targets}` ·
   `check:attempt {attemptId, characterId, skill, mode, d15{total,chain,crit,fail}, luck{base,sum,cosmic}, state}` ·
   `check:attempt-updated {attemptId, newTotal, kept}` (cosmic) ·
@@ -157,21 +189,22 @@ work, matching the "keep the codebase as simple as possible" directive.
 - **Lifecycle/tray/mode/re-roll logic** lives in component state (Svelte 5 runes), synced by
   these events — port directly from the prototype's JS.
 
-### DECISION 3 — Build location: standalone `/player` route first (2026-06-05)
-Build in a **new `src/routes/(main_layout)/player/+page.svelte`** route, not inside the
-debug-scaffolded `game/+page.svelte` yet. Port the prototype's three panes to Svelte
-components, wire to broadcast incrementally. **The components are the durable asset; the
-route wrapper is disposable** — fold the components into the real 3-pane `game` layout once
-proven. Low risk to the working game page.
+### DECISION 3 — Build location (UPDATED — role-aware routes now exist)
+Originally: build the player UI in a standalone `/player` route first. That's done, and it
+has since grown into **role-aware routing (Option A)**:
+- **`/player?game_id=`** — the Player view (game-scoped; mock sandbox with no `game_id`).
+- **`/gm?game_id=`** — the GM view (scaffold today; broadcast wiring is the active step).
+- **`/games`** — routes each of your seats to `/player` or `/gm` by role.
+- The legacy `game/+page.svelte` (old Party/Character/Chat panels + the `debugger;` /
+  forced-modal scaffolding) is **left intact and unlinked** — additive, reversible. Decide
+  its fate (fold in vs retire) when the persisted model lands.
 
-### Prerequisites (because this initiative deliberately SKIPS character creation)
-- **Test character without the creation wizard.** Start with a lightweight mock character
-  object (mirror the prototype's skill list / `Vesh Kaur`) so the slice doesn't depend on a
-  DB character existing. Wire to a real seeded `character` row (via `createCharacter.js`)
-  as a follow-up. "Work backwards to the planned UX" = build the target player view first,
-  backfill the character/GM plumbing after.
-- **Minimal GM trigger.** A bare control (broadcast-driven) to stage a gate and
-  narrate/resolve — enough to drive the player UI. Real GM interface is out of scope here.
+### Prerequisites (DONE — this initiative deliberately SKIPS character creation)
+- **Test character without the creation wizard:** ✅ done both ways — a local mock character
+  (no `game_id`) and a real seeded `character` (game 24, see STATUS test-data) rendered via
+  `createCharacter.js` helpers.
+- **Minimal GM trigger:** ✅ the local **GM Sim bar** drives the player UI today (mock); the
+  real GM side is the `/gm` view + broadcast wiring now in progress.
 
 ### INTENDED FUTURE ARCHITECTURE (the migration target — do NOT lose this)
 When we outgrow the broadcast scaffold, promote the lifecycle to **real tables wired into
