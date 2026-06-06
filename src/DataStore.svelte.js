@@ -304,7 +304,15 @@ export default class DataStore {
     this.supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_IN' && session) {
         this.user = session.user;
-        goto('/games');
+        // Only bounce to the games list from neutral entry pages. SIGNED_IN also
+        // fires on session-restore on EVERY page load, so an unconditional redirect
+        // here hijacks deep links into a game/player screen.
+        if (typeof window !== 'undefined') {
+          const path = window.location.pathname;
+          if (path === '/' || path === '' || path.endsWith('/login') || path.endsWith('/signup')) {
+            goto('/games');
+          }
+        }
       } else if (event === 'PASSWORD_RECOVERY' && session) {
         this.user = session.user;
         goto('/reset-password');
