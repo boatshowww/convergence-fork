@@ -94,15 +94,17 @@ Build sequence: prototype → local slice → real-data → role-aware routing �
 - **Role-aware routing (Option A):** `/games` lists by **membership** (your player seats) with role badges → routes Player→`/player?game_id=`, GM→`/gm?game_id=`. New `/gm` route + `gm/GmView.svelte` (**scaffold**: stage control + pending-resolutions queue; guards to GM seats).
 - `DataStore.svelte.js`: `SIGNED_IN` redirect gated to neutral pages only (deep links no longer hijacked).
 
-**IN PROGRESS — Step 1 (broadcast wiring):**
-- ✅ Realtime broadcast **transport verified** on the self-hosted stack (two clients exchanged a `check:*` event on `game-broadcast:24`).
-- ✅ Shared helper `src/lib/check/net.js` — `makeCheckNet(store, onEvent) → { clientId, send, dispose }`. Sends on `store.realtimeChannels.broadcast`; receives via `store.on('game-event', …)` where **`event.args` is the raw supabase message** `{type,event,payload}`; ignores own `senderId`. **NOT yet wired into the controllers.**
+**DONE — broadcast wiring (built 2026-06-07; awaiting the two-browser test):**
+- `src/lib/check/net.js` — `makeCheckNet(store, onEvent) → {clientId, send, dispose}`; sends on `store.realtimeChannels.broadcast`, receives via `store.on('game-event', …)` (where `event.args` is the raw supabase msg), ignores own `senderId`. Transport verified.
+- **Player** (`playerCheck.svelte.js` + `/player` host): emits `check:attempt` / `-updated` / `-ejected`; applies `gate-staged` / `gate-cancelled` / `resolved` / `attempt-dismissed` / `token-granted`. Each pending attempt carries a global `attemptId`. GM Sim bar now shows **only on the mock route** (no game_id).
+- **GM** (`gm/gmCheck.svelte.js` + rewritten `gm/GmView.svelte` + `/gm` host): stage form with **per-skill DCs** (DCs stay local — only skill NAMES broadcast); live attempt queue; resolve via the **implicit band** (`src/lib/check/bands.js`: +5 crit / −3 partial, + natural 15/1); dismiss; cancel-gate; grant token.
+- **Resolution model:** the GM sets/confirms a DC at resolve — **pre-filled if staged, entered on the fly for player-initiated checks (Door 2)**; the band is implicit (total vs DC); the GM types narration; the player receives **tier + text, never the number** (DCs never cross the wire). Discard works both ways: player ejects (`attempt-ejected`) ↔ GM dismisses (`attempt-dismissed`).
+- **Log entries are source-aware** (`source: player|gm` — `system|ai` ready for the LLM seam).
+- **Two-browser test:** GM as `+test1` (`/gm?game_id=24`) + player as main (`/player?game_id=24`).
+- Still **ephemeral** (no persistence; refresh resets; late-joiners see nothing prior). Deferred: formal resolution modes (first-success / best-result), "other skill" UX.
 
-**NEXT STEPS (resume here):**
-1. **Finish broadcast wiring (step 1).**
-   - *Player* (`playerCheck.svelte.js` + `/player` host): give each pending attempt a global `attemptId`; on CHECK-commit / cosmic / discard call `net.send('check:attempt' | 'check:attempt-updated' | 'check:attempt-ejected', …)`; add receive handlers `applyGateStaged`, `applyResolved` (match by `attemptId`), token-granted (if `playerId === me`). Create `net` + `me{playerId,characterName}` when `status==='ready'`; hide the GM Sim bar in game mode.
-   - *GM*: build `gm/gmCheck.svelte.js` (holds the secret bands; `stage`→`check:gate-staged`; receive `check:attempt*`→pending queue; `resolve(attemptId)`→compute band→`check:resolved`; `grant(playerId)`→`check:token-granted`). Wire `GmView` + `makeCheckNet` in the `/gm` host; replace the scaffold/sim.
-   - Event shapes: see **DECISION 2** below. Verify with the two-browser test.
+**NEXT STEPS:**
+1. Fold in any fixes from the two-browser run.
 2. **Step 3 — persist cosmic tokens (SCHEMA CHANGE Scott applies).** Proposed: `ALTER TABLE public.character ADD COLUMN cosmic_tokens smallint NOT NULL DEFAULT 0;` (cap of 2 still enforced in code). Flag explicitly + give Studio steps before wiring read/write.
 3. *(Later)* migrate off the broadcast scaffold to the persisted model (see INTENDED FUTURE ARCHITECTURE); retire `Check.svelte` for checks.
 

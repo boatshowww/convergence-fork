@@ -66,6 +66,16 @@ export class PlayerCheck {
   character = $state(MOCK_CHARACTER);
   ready = $state(true);
 
+  // ---- broadcast wiring (set in game mode; null on the mock route) ----
+  net = null; // { send, clientId } from makeCheckNet
+  me = { playerId: null, characterName: null };
+  _aseq = 0;
+
+  attach(net, me) { this.net = net; this.me = { ...this.me, ...me }; }
+  _attemptId() { return `${this.net?.clientId ?? 'mock'}:${++this._aseq}`; }
+  _findByAttempt(attemptId) { return this.stream.find((i) => i.attemptId === attemptId); }
+  _emit(event, data) { this.net?.send(event, data); }
+
   constructor(character = null) {
     if (character) this.character = character;
     this.stream.push({
@@ -97,14 +107,14 @@ export class PlayerCheck {
     this.doRoll(name, 'check');
   }
 
-  doRoll(name, mode) {
+  doRoll(name, mode, opts = {}) {
     const d15 = rollD15();
     const luck = rollLuck(this.luckStat);
     if (luck.cosmic) this.grantToken();
 
     if (mode === 'just') {
       this.stream.push({
-        id: uid('r'), kind: 'roll', skill: name, state: 'unevaluated',
+        id: uid('r'), kind: 'roll', source: 'player', skill: name, state: 'unevaluated',
         d15, luck, total: d15.total, cosmicUsed: false, ejected: false, cosmic: null,
         note: 'Thrown for the feel of it — not sent to the GM.',
       });
@@ -112,12 +122,19 @@ export class PlayerCheck {
     }
 
     const item = {
-      id: uid('c'), kind: 'roll', skill: name, state: 'pending',
+      id: uid('c'), attemptId: this._attemptId(), gateId: opts.gateId ?? null,
+      kind: 'roll', source: 'player', skill: name, state: 'pending',
       d15, luck, total: d15.total, cosmicUsed: false, ejected: false, cosmic: null, band: null,
       note: 'Waiting for the GM to narrate the outcome. The cosmic window stays open until they do.',
     };
     this.stream.push(item);
     this.pending[name] = item.id;
+    // tell the GM about the committed check (DC/resolution happen on their side)
+    this._emit('check:attempt', {
+      attemptId: item.attemptId, gateId: item.gateId,
+      playerId: this.me.playerId, characterName: this.character?.name ?? this.me.characterName ?? 'Player',
+      skill: name, total: item.total, crit: d15.crit, fail: d15.fail,
+    });
   }
 
   // ---- re-roll path A: cosmic (funded, keep-highest) --------------------------
@@ -136,6 +153,7 @@ export class PlayerCheck {
     item.cosmicUsed = true;
     item.cosmic = { prev, next: d15.total, kept };
     item.note = "Cosmos claimed. The higher of the two stands. Still awaiting the GM's word.";
+    this._emit('check:attempt-updated', { attemptId: item.attemptId, total: item.total });
   }
 
   // ---- re-roll path B: discard (unfunded, EJECTS from queue) -------------------
@@ -157,6 +175,7 @@ export class PlayerCheck {
         item.ejected = true;
         item.cosmic = null;
         item.note = "Removed from the GM's queue by re-rolling. This attempt no longer counts.";
+        this._emit('check:attempt-ejected', { attemptId: item.attemptId });
       }
       delete this.pending[name];
     }
@@ -164,24 +183,60 @@ export class PlayerCheck {
     this.doRoll(name, 'just'); // the new roll is itself just a throw
   }
 
-  // ---- GM side (stand-in; Step 3 moves these onto the broadcast channel) -------
-  gmStage() {
-    this.flagged = [...PROMPT_SKILLS];
+  // ---- prompts: shared by the mock sim AND remote gate-staged events -----------
+  _pushPrompt({ gateId, fiction, hint, skills }) {
+    this.flagged = [...skills];
     this.stream.push({
-      id: uid('p'), kind: 'prompt', committed: null,
-      fiction: 'You turn the box over. What can you tell about it?',
-      hint: '(different skills read it differently)',
-      skills: [...PROMPT_SKILLS],
+      id: gateId, kind: 'prompt', source: 'gm', committed: null,
+      fiction, hint: hint ?? '', skills: [...skills],
     });
   }
 
-  /** Commit a flagged skill from a GM prompt card → always a real check. */
+  /** Commit a flagged skill from a GM prompt card → always a real check (tagged with its gate). */
   gmCommit(promptId, name) {
     if (this.pending[name]) { this.requestDiscard(name); return; }
     const prompt = this._find(promptId);
     if (prompt) prompt.committed = name;
     this.flagged = [];
-    this.doRoll(name, 'check');
+    this.doRoll(name, 'check', { gateId: promptId });
+  }
+
+  // mock GM sim (no game): stage a preset prompt locally
+  gmStage() {
+    this._pushPrompt({ gateId: uid('p'), fiction: 'You turn the box over. What can you tell about it?', hint: '(different skills read it differently)', skills: PROMPT_SKILLS });
+  }
+
+  // ---- remote GM events applied in game mode ----------------------------------
+  applyGateStaged({ gateId, fiction, hint, skills }) {
+    this._pushPrompt({ gateId, fiction, hint, skills: skills ?? [] });
+  }
+  applyGateCancelled({ gateId }) {
+    const idx = this.stream.findIndex((i) => i.kind === 'prompt' && i.id === gateId);
+    if (idx === -1) return;
+    const skills = this.stream[idx].skills ?? [];
+    this.stream.splice(idx, 1);
+    this.flagged = this.flagged.filter((s) => !skills.includes(s));
+  }
+  applyResolved({ attemptId, skill, bandLabel, bandCls, bandText }) {
+    const item = this._findByAttempt(attemptId);
+    if (item && item.state === 'pending') {
+      item.state = 'resolved';
+      item.band = { label: bandLabel, cls: bandCls };
+      delete this.pending[item.skill];
+    }
+    this.stream.push({
+      id: uid('f'), kind: 'fiction', source: 'gm', who: 'GM · Narration',
+      text: bandText, band: { label: `${skill ?? item?.skill ?? ''} · ${bandLabel}`, cls: bandCls },
+    });
+  }
+  applyDismissed({ attemptId }) {
+    const item = this._findByAttempt(attemptId);
+    if (!item) return;
+    item.state = 'unevaluated';
+    item.ejected = true;
+    item.cosmic = null;
+    item.note = 'Dismissed by the GM.';
+    delete this.pending[item.skill];
   }
 
   gmResolveOldest() {

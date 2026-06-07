@@ -11,6 +11,7 @@
   import { getContext, setContext, onMount } from 'svelte';
   import { page } from '$app/state';
   import { getPath } from '@utils/navigation';
+  import { makeCheckNet } from '@lib/check/net.js';
   import { PlayerCheck } from './playerCheck.svelte.js';
   import CharacterSheet from './components/CharacterSheet.svelte';
   import StarMap from './components/StarMap.svelte';
@@ -19,6 +20,7 @@
   const store = getContext('store');
   const check = new PlayerCheck();
   setContext('check', check);
+  let net = null;
 
   let status = $state('mock'); // mock | loading | ready | error | no-character
   let statusMsg = $state('');
@@ -54,6 +56,17 @@
 
         check.character = buildCharacterVM(character);
         check.ready = true;
+
+        // wire the broadcast channel: emit our attempts, apply the GM's events
+        net = makeCheckNet(store, (event, data) => {
+          if (event === 'check:gate-staged') check.applyGateStaged(data);
+          else if (event === 'check:gate-cancelled') check.applyGateCancelled(data);
+          else if (event === 'check:resolved') check.applyResolved(data);
+          else if (event === 'check:attempt-dismissed') check.applyDismissed(data);
+          else if (event === 'check:token-granted' && data.playerId === seat.id) check.grantToken();
+        });
+        check.attach(net, { playerId: seat.id, characterName: character.name });
+
         status = 'ready';
       } catch (e) {
         status = 'error';
@@ -61,7 +74,7 @@
       }
     })();
 
-    return () => store.clearGameData?.();
+    return () => { net?.dispose(); store.clearGameData?.(); };
   });
 
   // Map a real character row (with createCharacter helpers) to the sheet's view-model.

@@ -4,9 +4,13 @@
   // Broadcast sync (players' live attempts) is wired in the next step.
   import { getContext, onMount } from 'svelte';
   import { page } from '$app/state';
+  import { makeCheckNet } from '@lib/check/net.js';
   import GmView from './GmView.svelte';
+  import { GmCheck } from './gmCheck.svelte.js';
 
   const store = getContext('store');
+  const gm = new GmCheck();
+  let net = null;
 
   let status = $state('loading'); // loading | ready | error
   let statusMsg = $state('');
@@ -34,6 +38,15 @@
         }
         hasCharacter = (seat?.characters ?? []).length > 0;
         gameName = store.data.game?.name ?? 'Game';
+
+        // wire the broadcast channel: receive players' attempts into the queue
+        net = makeCheckNet(store, (event, data) => {
+          if (event === 'check:attempt') gm.applyAttempt(data);
+          else if (event === 'check:attempt-updated') gm.applyAttemptUpdated(data);
+          else if (event === 'check:attempt-ejected') gm.applyAttemptEjected(data);
+        });
+        gm.attach(net);
+
         status = 'ready';
       } catch (e) {
         status = 'error';
@@ -41,8 +54,8 @@
       }
     })();
 
-    return () => store.clearGameData?.();
+    return () => { net?.dispose(); store.clearGameData?.(); };
   });
 </script>
 
-<GmView {status} {statusMsg} {gameName} {gameId} {hasCharacter} />
+<GmView {status} {statusMsg} {gameName} {gameId} {hasCharacter} {gm} />
