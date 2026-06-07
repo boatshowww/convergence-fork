@@ -109,8 +109,6 @@
   let selectedRace = $state(null);
   let usedStatPoints = $derived(character.intelligence + character.charisma + character.strength + character.dexterity + character.intuition + character.luck + character.constitution);
   let remainingStatPoints = $derived(45 - usedStatPoints);
-  let generatePromptText = $state('');
-  let generateNameAndBackgroundPromptText = $state('');
 
   function handleClassChange(e) {
     const class_id = parseInt(e.target.value);
@@ -193,54 +191,15 @@
     }
   }
 
-  async function handleGenerateNameAndBackground() {
-    showPanel('loading');
-    /**
-    *  Generate the character TODO - implement Open AI API and run this through with a contextual function and some 
-    *   prompt engeineering to include the character information and some game design information 
-     */
-    // let generatedCharacter = await store.generate_character(generatePromptText);
-
-    // character.name = generatedCharacter.name;
-    // character.background = generatedCharacter.background;
-    setTimeout(() => {
-      character.name = 'John Doe';
-      character.background = 'John Doe is a 30 year old male who is a software engineer and lives in San Francisco.';
-      showPanel('name');
-    }, 1500);
-
-    // showPanel('name');
-  }
-
-  async function handleGenerate() {
-    showPanel('loading');
-
-    // TODO - implement Open AI API and run this through with a contextual function and some prompt engeineering to include the character information and some game design information 
-    setTimeout(() => {
-      showPanel('finalize')
-    }, 2000);
-  }
-  
 </script>
 
 <Modal title="Character Creation" bind:this={modalRef}>
   <div class="modal-container">
     {#if currentPanel === 'welcome'}
       <div class="creation-panel" transition:slide onoutroend={handleOutroEnd}>
-        <span>Mysteries await you as you explore the converging star systems near the supermassive black hole at the galactic core.  Describe your past to start the path to forging your destiny.</span>
-        <div class="form-group" style="margin-top: 2rem;">
-          <label for="character-description">Describe your character</label>
-          <textarea
-            id="character-description"
-            class="btn"
-            bind:value={generatePromptText}
-            style="width: 100%; min-height: 120px; font-size: 1.1rem; padding: 1rem; resize: vertical;"
-            placeholder="Write a detailed description of your character, their background, goals, and anything else you want the AI to use."
-          ></textarea>
-        </div>
-        <div class="modal-actions">
-          <button class="btn btn-primary" onclick={handleGenerate}>Generate</button>
-          <button class="btn btn-secondary" onclick={() => showPanel('class')}>Manual character creation</button>
+        <span>Mysteries await you as you explore the converging star systems near the supermassive black hole at the galactic core. Forge your destiny one choice at a time.</span>
+        <div class="modal-actions" style="margin-top: 2rem;">
+          <button class="btn btn-primary" onclick={() => showPanel('class')}>Create Your Character</button>
         </div>
       </div>
     {/if}
@@ -459,11 +418,6 @@
     {#if currentPanel === 'name'}
       <div class="creation-panel" transition:slide onoutroend={handleOutroEnd}>
         <div class="form-group">
-          <label>Generate Name & Background (AI)</label>
-          <textarea class="btn" type="text" bind:value={generateNameAndBackgroundPromptText} placeholder="Add anything to guide the AI..." style="width: 100%;" />
-          <button class="btn btn-primary" onclick={handleGenerateNameAndBackground}>Generate</button>
-        </div>
-        <div class="form-group">
           <label>Character Name</label>
           <input class="btn" type="text" bind:value={character.name} style="width: 100%;" />
         </div>
@@ -500,11 +454,6 @@
           <button class="btn" onclick={() => showPanel('name')}>Return to Name &amp; Background Selection</button>
           <button class="btn btn-primary" onclick={handleFinalize} disabled={creating}>{creating ? 'Creating…' : 'Create Character'}</button>
         </div>
-      </div>
-    {/if}
-    {#if currentPanel === 'loading'}
-      <div class="creation-panel" transition:slide onoutroend={handleOutroEnd}>
-        <div>Loading...</div>
       </div>
     {/if}
   </div>
