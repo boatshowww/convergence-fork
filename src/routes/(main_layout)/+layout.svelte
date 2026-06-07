@@ -67,7 +67,7 @@
 <div class="main-container">
   <header>
     <a class="logo-container" href="{getPath('/')}">
-      <img src="{getPath('/images/logo.png')}" alt="Convergence" class="logo-image" />
+      <img src="{getPath('/images/logo-white.png')}" alt="Convergence" class="logo-image" />
       <h1 class="title desktop-only">CONVERGENCE</h1>
       <h2 class="title mobile-only">CONVERGENCE</h2>
     </a>
