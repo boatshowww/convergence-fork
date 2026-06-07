@@ -253,6 +253,60 @@ committed/cosmic/"this counts" (reserve it); **Red** = critical-fail/destructive
 Fonts: `Chakra Petch` (HUD/labels) + `Spectral` (fiction/narration, italic). Spend
 animation budget on (a) dice + crit chain, (b) cosmic claim, (c) pending→narrated.
 
+## LLM functionality (FUTURE — roadmap, do NOT build yet)
+
+Goal: optional AI features — **GM-driven character generation**, **contextual chat in
+the log**, more later — running against a **self-hosted local model** (no per-token cost).
+Must stay **additive**: core functionality works without it.
+
+### The data model is already AI-ready (no schema change needed for LLM)
+- `llm_model` — provider-agnostic, with cost-per-(input/cached/output)-token columns. A
+  local model is just a row with `provider='local'`, cost `0`. Cloud + local coexist.
+- `llm_thread` (per `user_id`+`game_id`) and `llm_entry` (full per-call log: `messages`
+  jsonb, tokens, timing, cost, success/error, **streaming timestamps**). Trigger
+  `calculate_timing_metrics` fills metrics; view `llm_cost_by_model`.
+- Stubs already in code: `store.generate_character(prompt)` (commented in
+  `CharacterCreation.svelte`), `handleLLMRequest` in `game/components/Chat.svelte`.
+
+### Cost control = self-host; local models speak OpenAI's API
+Ollama / llama.cpp / vLLM / LM Studio all expose an **OpenAI-compatible
+`/v1/chat/completions`**. Build the call layer to that shape → local↔cloud is a config
+swap (base URL + model + key), distinguished by `llm_model.provider`. Self-hosting removes
+per-token billing entirely (compute is fixed hardware you own).
+
+### Call topology — DECISION DEFERRED (lean: Supabase Edge Function mediator)
+The app is `adapter-static` (no app-server tier). Options:
+- **Client → local LLM directly:** simplest, but endpoint/config live in the browser, no
+  central control, LAN-only (the public GitHub Pages build can't reach the LAN).
+- **Supabase Edge Function mediator (LEAN):** SPA → Edge Function (in the Supabase VM) →
+  local LLM → logs `llm_entry` → returns. Keeps the app static, reuses the Supabase tier,
+  hides the endpoint, centralizes prompts/auth/logging. Value is hygiene, not cost.
+- **App server** (adapter-node / separate service): heaviest; only if we outgrow Edge Functions.
+Decide when the local serving stack is chosen — not now.
+
+### Forward-compatible choices to make WHILE building core (cheap; land in the broadcast/log step)
+1. **One LLM seam:** all access behind `src/lib/llm/` (`generateCharacter(prompt)`,
+   `chat(threadId, msg)`); impl starts as a "not configured" stub → later client-direct or
+   Edge-Function-backed with zero feature changes. The existing stubs call this.
+2. **Source-aware log entries:** entries / broadcast events carry an `author`/`source`
+   (`player | gm | system | ai`) + a `pending/streaming` state. Then AI chat is just
+   another source, and a streamed AI reply is an entry that *updates* (same mechanism as
+   pending→resolved). **Do this when wiring the check log (next step).**
+3. **AI proposes, human disposes:** generated characters flow into the **editable creation
+   wizard for review** (never straight to the DB); chat suggestions are draft entries the GM
+   accepts. Keeps data integrity independent of model quality. (NPC fits the ownership model:
+   `is_npc=true`, `user_id=GM`, `game_id`.)
+4. **Async + gated:** non-blocking generation with loading/streaming states (the wizard
+   `loading` panel exists); **feature-flag** AI (`llmEnabled`, derived from whether a model/
+   endpoint is configured) so affordances vanish when no model is available — core never
+   depends on AI and the public build degrades gracefully.
+5. **Reuse broadcast/log as the AI delivery channel:** AI content posts into the same log
+   store tagged `source='ai'`; keep the entry model generic (system/AI can emit), not human-only.
+
+**Net:** nothing blocks current work. Only two new habits — the LLM seam (#1) and
+source-aware/streamable entries (#2) — both nearly free, and both land naturally during the
+broadcast/log step that is next.
+
 ## DB schema tracking (ESTABLISHED 2026-05-29)
 
 **Goal (achieved):** capture the real schema in version control and define a
