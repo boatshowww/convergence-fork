@@ -16,3 +16,6 @@ Thumbs.db
 *.swp
 *.tmp
 *.bak
+
+# Large editable design source (GIMP) — backed up via Syncthing, not git
+*.xcf
