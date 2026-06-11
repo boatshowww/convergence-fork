@@ -105,7 +105,30 @@ Build sequence: prototype → local slice → real-data → role-aware routing �
 
 **NEXT STEPS:**
 1. Fold in any fixes from the two-browser run.
-2. **Step 3 — persist cosmic tokens (SCHEMA CHANGE Scott applies).** Proposed: `ALTER TABLE public.character ADD COLUMN cosmic_tokens smallint NOT NULL DEFAULT 0;` (cap of 2 still enforced in code). Flag explicitly + give Studio steps before wiring read/write.
+2. **Step 3 — persist cosmic tokens (SCHEMA CHANGE Scott applies).**
+
+### INITIATIVE: Tactical Radar (started 2026-06-11) — the combat centerpiece
+Full plan: `~/.claude/plans/zesty-orbiting-willow.md`. Design source:
+`docs/Architecture/Mockups/mockup - Radar Action Notes.md` (its **Text Elements** section is
+the spec; the rest is compressed Excalidraw JSON).
+- **Decisions (Scott):** ships first (character mode later on the same engine); **GM-authoritative
+  state + GM localStorage autosave + full-snapshot broadcast to (re)joining players — NO schema
+  change now**; **WEGO simultaneous turns** (players plot+confirm → GM Execute Turn); **Phaser
+  3.88.2** renders it (already a dependency).
+- **Mockup mechanics:** 5,000 km draw distance; 15 s turns; inner circle = navigable radius
+  (= speed×t; 46 km/s → 690 km); contacts w/ velocity vectors; click own ship → Plot Course /
+  Target Weapons / Redirect Shields / Network Attack; plot = bounds → point → **new vel/G/fuel
+  HUD** → confirm → exit vector → confirm. Station-gating deferred.
+- **Module:** `src/lib/radar/` — `model.js` (engagement/entity, constants), `maneuver.js`
+  (+tests; game-feel constants `DELTA_V_PER_G=4`, `FUEL_PER_KMS=0.17` tuned to mockup numbers),
+  `phaser/RadarScene.js` (bridge contract: getEngagement/getViewerEntityId/onSelect/subscribe),
+  `RadarCanvas.svelte` (dynamic-imports Phaser), `demo.js` (mock-sandbox scene).
+- **Phases:** P1 foundation render ✅(built; verify pending) · P2 GM setup+sync(localStorage/
+  snapshot; `net.js` gains `radar:` prefix) · P3 plot+WEGO execute · P4 actions→existing check
+  queue with geometry-suggested DC (`difficulty.js`) · P5 fog of war (GM click-drag reveal
+  strokes) · P6 polish. Radar `check:attempt`s carry `{action, targetId, suggestedDc}`.
+- Mock `/player` center pane shows a **demo engagement** (headless-verifiable); real games show
+  the radar when the GM enables an engagement (P2+). Proposed: `ALTER TABLE public.character ADD COLUMN cosmic_tokens smallint NOT NULL DEFAULT 0;` (cap of 2 still enforced in code). Flag explicitly + give Studio steps before wiring read/write.
 3. *(Later)* migrate off the broadcast scaffold to the persisted model (see INTENDED FUTURE ARCHITECTURE); retire `Check.svelte` for checks.
 
 **TEST DATA / INFRA (seeded in the live DB — DML only, NOT in git):**

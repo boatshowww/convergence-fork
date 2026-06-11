@@ -13,14 +13,20 @@
   import { getPath } from '@utils/navigation';
   import { makeCheckNet } from '@lib/check/net.js';
   import { PlayerCheck } from './playerCheck.svelte.js';
+  import { makeDemoBridge } from '@lib/radar/demo.js';
   import CharacterSheet from './components/CharacterSheet.svelte';
   import StarMap from './components/StarMap.svelte';
+  import RadarPane from './components/RadarPane.svelte';
   import CheckLog from './components/CheckLog.svelte';
 
   const store = getContext('store');
   const check = new PlayerCheck();
   setContext('check', check);
   let net = null;
+
+  // Mock sandbox: a demo ship engagement so the radar renders without a GM/DB.
+  // In a real game the radar appears when the GM enables an engagement (phase 2).
+  const demoBridge = makeDemoBridge();
 
   let status = $state('mock'); // mock | loading | ready | error | no-character
   let statusMsg = $state('');
@@ -126,7 +132,11 @@
   {#if isGM && gameId}<a class="pc-switch floating" href={getPath('/gm?game_id=' + gameId)}>⇄ GM view</a>{/if}
   <div class="app">
     <CharacterSheet />
-    <StarMap />
+    {#if status === 'mock'}
+      <RadarPane bridge={demoBridge} title="Tactical (demo)" subtitle="Hullusta · Refinery District" />
+    {:else}
+      <StarMap />
+    {/if}
     <CheckLog />
   </div>
 
