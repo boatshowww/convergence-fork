@@ -16,6 +16,7 @@
  * (P3 adds plot/turn events; P5 adds radar:fog.)
  */
 import { createEngagement, createEntity, snapshotEngagement } from './model.js';
+import { evaluateManeuver, resolveTurn } from './maneuver.js';
 
 const storageKey = (gameId) => `radar:scene:${gameId}`;
 
@@ -24,6 +25,16 @@ export class RadarController {
   selectedId = $state(null);
   /** GM palette interaction mode: 'move' (drag position) | 'vector' (drag velocity) */
   gmMode = $state('move');
+  /**
+   * Player plot-course state machine (mockup flow):
+   * null | { stage:'target'|'exit'|'confirm', entityId, hover:{x,y}|null,
+   *          target:{x,y}|null, maneuver: evaluateManeuver() result | null }
+   */
+  plotState = $state(null);
+  /** Player: my confirmed plot this turn. */
+  myPlot = $state(null);
+  /** GM: confirmed plots received this turn, entityId -> plot. */
+  plots = $state({});
 
   constructor({ role, gameId = null, seatId = null }) {
     this.role = role; // 'gm' | 'player'
@@ -45,8 +56,10 @@ export class RadarController {
       if (event === 'radar:scene-start') this._applySnapshot(data.snapshot);
       else if (event === 'radar:scene-update') this._applyUpdate(data);
       else if (event === 'radar:scene-end') { this.engagement = null; this._notify(); }
+      else if (event === 'radar:turn-result') this._applyTurnResult(data);
     } else if (this.role === 'gm') {
       if (event === 'radar:sync-request') this._broadcastSnapshot();
+      else if (event === 'radar:plot') { this.plots[data.entityId] = data.plot; this._notify(); }
     }
   }
 
@@ -55,15 +68,121 @@ export class RadarController {
     return {
       getEngagement: () => this.engagement,
       getViewerEntityId: () => this.viewerEntityId,
-      onSelect: (id) => { this.selectedId = id; },
+      onSelect: (id) => this._handleSelect(id),
       subscribe: (fn) => { this._listeners.add(fn); return () => this._listeners.delete(fn); },
+      getPlotState: () => this.plotState,
+      getPlots: () => {
+        // plots to draw: GM sees all confirmed; a player sees their own
+        if (this.role === 'gm') return Object.entries(this.plots).map(([entityId, plot]) => ({ entityId, plot }));
+        return this.myPlot ? [{ entityId: this.myPlot.entityId, plot: this.myPlot.plot }] : [];
+      },
       gm: this.role === 'gm' ? {
         getMode: () => this.gmMode,
         onDragMove: (id, x, y) => this.updateEntity(id, { x, y }, { silent: true }),
         onDragVector: (id, vx, vy) => this.updateEntity(id, { vx, vy }, { silent: true }),
         onDragEnd: (id) => this._afterMutation(this.engagement?.entities.find((e) => e.id === id)),
       } : null,
+      player: this.role === 'player' ? {
+        isPlotting: () => Boolean(this.plotState),
+        onPlotHover: (x, y) => this.hoverPlot(x, y),
+        onPlotClick: (x, y) => this.clickPlot(x, y),
+      } : null,
     };
+  }
+
+  _handleSelect(id) {
+    this.selectedId = id;
+    // Player: tapping your own ship during planning starts plotting a course.
+    // (P4 turns this into the full action menu; Plot Course remains the default.)
+    if (this.role === 'player' && id && id === this.viewerEntityId
+        && this.engagement?.phase === 'planning' && !this.plotState && !this.myPlot) {
+      this.beginPlot(id);
+    }
+  }
+
+  // ---------- player: plot-course state machine (mockup flow) ----------
+  beginPlot(entityId) {
+    this.plotState = { stage: 'target', entityId, hover: null, target: null, maneuver: null };
+    this._notify();
+  }
+
+  _plotEntity() {
+    return this.engagement?.entities.find((e) => e.id === this.plotState?.entityId) ?? null;
+  }
+
+  hoverPlot(x, y) {
+    const ps = this.plotState;
+    const e = this._plotEntity();
+    if (!ps || !e) return;
+    ps.hover = { x, y };
+    if (ps.stage === 'target') ps.maneuver = evaluateManeuver(e, { x, y });
+    else if (ps.stage === 'exit') ps.maneuver = evaluateManeuver(e, ps.target, { x: x - ps.target.x, y: y - ps.target.y });
+    this._notify();
+  }
+
+  clickPlot(x, y) {
+    const ps = this.plotState;
+    const e = this._plotEntity();
+    if (!ps || !e) return;
+    if (ps.stage === 'target') {
+      const m = evaluateManeuver(e, { x, y });
+      if (!m.valid) return; // can't lock an unreachable point
+      ps.target = { x, y };
+      ps.maneuver = m;
+      ps.stage = 'exit';
+    } else if (ps.stage === 'exit') {
+      ps.maneuver = evaluateManeuver(e, ps.target, { x: x - ps.target.x, y: y - ps.target.y });
+      if (!ps.maneuver.valid) return;
+      ps.stage = 'confirm'; // overlay shows Confirm Maneuver? yes/no
+    }
+    this._notify();
+  }
+
+  cancelPlot() { this.plotState = null; this._notify(); }
+
+  confirmPlot() {
+    const ps = this.plotState;
+    if (!ps || ps.stage !== 'confirm' || !ps.maneuver?.valid) return;
+    const plot = {
+      target: ps.maneuver.target,
+      newVel: ps.maneuver.newVel,
+      newSpeed: ps.maneuver.newSpeed,
+      gForce: ps.maneuver.gForce,
+      fuelCost: ps.maneuver.fuelCost,
+    };
+    this.myPlot = { entityId: ps.entityId, plot };
+    this.plotState = null;
+    this.net?.send('radar:plot', { entityId: ps.entityId, plot });
+    this._notify();
+  }
+
+  // ---------- GM: WEGO turn execution ----------
+  get readiness() {
+    if (this.role !== 'gm' || !this.engagement) return [];
+    return this.engagement.entities
+      .filter((e) => e.kind === 'ship' && e.ownerSeatId != null)
+      .map((e) => ({ id: e.id, name: e.name, ready: Boolean(this.plots[e.id]) }));
+  }
+
+  executeTurn() {
+    if (this.role !== 'gm' || !this.engagement || this.engagement.status !== 'active') return;
+    this.engagement.entities = resolveTurn(this.engagement.entities, this.plots);
+    this.engagement.turn += 1;
+    this.plots = {};
+    this._save(); this._notify();
+    this.net?.send('radar:turn-result', {
+      turn: this.engagement.turn,
+      entities: snapshotEngagement(this.engagement).entities,
+    });
+  }
+
+  _applyTurnResult({ turn, entities }) {
+    if (!this.engagement) return;
+    this.engagement.entities = entities;
+    this.engagement.turn = turn;
+    this.myPlot = null;
+    this.plotState = null;
+    this._notify();
   }
 
   get viewerEntityId() {

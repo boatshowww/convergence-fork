@@ -13,7 +13,7 @@
   import { getPath } from '@utils/navigation';
   import { makeCheckNet } from '@lib/check/net.js';
   import { PlayerCheck } from './playerCheck.svelte.js';
-  import { makeDemoBridge } from '@lib/radar/demo.js';
+  import { makeDemoRadar } from '@lib/radar/demo.js';
   import { RadarController } from '@lib/radar/radarState.svelte.js';
   import CharacterSheet from './components/CharacterSheet.svelte';
   import StarMap from './components/StarMap.svelte';
@@ -25,9 +25,10 @@
   setContext('check', check);
   let net = null;
 
-  // Mock sandbox: a demo ship engagement so the radar renders without a GM/DB.
-  // In a real game the radar appears when the GM enables an engagement.
-  const demoBridge = makeDemoBridge();
+  // Mock sandbox: a demo ship engagement so the radar (and the full plot-course
+  // flow) runs without a GM/DB. In a real game the radar appears when the GM
+  // enables an engagement.
+  const demoRadar = makeDemoRadar();
   let radar = $state(null);
 
   let status = $state('mock'); // mock | loading | ready | error | no-character
@@ -140,9 +141,9 @@
   <div class="app">
     <CharacterSheet />
     {#if status === 'mock'}
-      <RadarPane bridge={demoBridge} title="Tactical (demo)" subtitle="Hullusta · Refinery District" />
+      <RadarPane bridge={demoRadar.bridge()} radar={demoRadar} title="Tactical (demo)" subtitle="Hullusta · Refinery District" />
     {:else if radar?.engagement?.status === 'active'}
-      <RadarPane bridge={radar.bridge()} title="Tactical" subtitle={radar.engagement.name} />
+      <RadarPane bridge={radar.bridge()} {radar} title="Tactical" subtitle={radar.engagement.name} />
     {:else}
       <StarMap />
     {/if}

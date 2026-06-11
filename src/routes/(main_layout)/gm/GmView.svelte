@@ -94,6 +94,11 @@
               {#if radar.engagement.status === 'setup'}
                 <button type="button" class="btn gold" onclick={() => radar.enable()}>Enable engagement</button>
               {:else}
+                <span class="turn-chip">Turn {radar.engagement.turn}</span>
+                {#each radar.readiness as r (r.id)}
+                  <span class="ready-chip {r.ready ? 'ready' : ''}">{r.name} {r.ready ? '✓ plotted' : '· planning'}</span>
+                {/each}
+                <button type="button" class="btn gold" onclick={() => radar.executeTurn()}>Execute turn</button>
                 <button type="button" class="btn ghost" onclick={() => radar.end()}>End engagement</button>
               {/if}
             </div>
@@ -252,4 +257,7 @@
   .status-badge { margin-left: 10px; font-size: 9px; letter-spacing: 0.14em; padding: 2px 8px; border-radius: 2px; border: 1px solid var(--edge-bright); color: var(--ink-dim); text-transform: uppercase; }
   .status-badge.active { color: var(--teal); border-color: var(--teal); }
   .status-badge.setup { color: var(--gold); border-color: var(--gold); }
+  .turn-chip { font-family: 'Chakra Petch', sans-serif; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink); }
+  .ready-chip { font-family: 'Chakra Petch', sans-serif; font-size: 10px; letter-spacing: 0.06em; padding: 3px 9px; border: 1px solid var(--edge); border-radius: 2px; color: var(--ink-faint); }
+  .ready-chip.ready { color: var(--teal); border-color: var(--teal-dim); }
 </style>
