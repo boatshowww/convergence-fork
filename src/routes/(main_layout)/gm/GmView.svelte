@@ -4,8 +4,17 @@
   // players' committed rolls arrive, set/confirm the DC, and resolve — the band is
   // implicit (total vs DC); the GM supplies the narration.
   import { getPath } from '@utils/navigation';
+  import RadarCanvas from '@lib/radar/RadarCanvas.svelte';
 
-  let { status = 'loading', statusMsg = '', gameName = 'Game', gameId = null, hasCharacter = false, gm } = $props();
+  let { status = 'loading', statusMsg = '', gameName = 'Game', gameId = null, hasCharacter = false, gm, radar = null, seats = [] } = $props();
+
+  // tactical scene authoring
+  let sceneName = $state('Engagement');
+  let shipSeatId = $state('');
+  function addShip() {
+    const seat = seats.find((s) => String(s.id) === String(shipSeatId));
+    radar.addEntity({ kind: 'ship', name: seat?.label ?? 'Ship', ownerSeatId: seat?.id ?? null, vx: 40, vy: 0 });
+  }
 
   // staging form
   let fiction = $state('');
@@ -32,6 +41,65 @@
           <a class="gm-switch" href={getPath('/player?game_id=' + gameId)}>⇄ Player view</a>
         {/if}
       </header>
+
+      <!-- Tactical radar: scene authoring + (P3) turn control -->
+      {#if radar}
+        <section class="gm-panel">
+          <h3 class="gm-panel-title">Tactical
+            {#if radar.engagement}
+              <span class="status-badge {radar.engagement.status}">{radar.engagement.status}</span>
+            {/if}
+          </h3>
+
+          {#if !radar.engagement}
+            <div class="palette-row">
+              <input class="scene-name" placeholder="Scene name" bind:value={sceneName} />
+              <button type="button" class="btn gold" onclick={() => radar.newScene({ kind: 'ship', name: sceneName })}>New ship engagement</button>
+            </div>
+            <p class="muted">Author the scene here, then enable it — players see nothing until you do.</p>
+          {:else}
+            <div class="palette-row">
+              <select bind:value={shipSeatId}>
+                <option value="">Crew ship for…</option>
+                {#each seats as s}<option value={s.id}>{s.label}</option>{/each}
+              </select>
+              <button type="button" class="btn ghost" disabled={!shipSeatId} onclick={addShip}>+ Ship</button>
+              <button type="button" class="btn ghost" onclick={() => radar.addEntity({ kind: 'bogey', name: 'Bogey', vx: -50, vy: 20 })}>+ Bogey</button>
+              <button type="button" class="btn ghost" onclick={() => radar.addEntity({ kind: 'debris', name: 'Debris', vx: 5, vy: -3 })}>+ Debris</button>
+              <span class="mode-toggle">
+                <button type="button" class="btn sm {radar.gmMode === 'move' ? 'gold' : 'ghost'}" onclick={() => radar.gmMode = 'move'}>Move</button>
+                <button type="button" class="btn sm {radar.gmMode === 'vector' ? 'gold' : 'ghost'}" onclick={() => radar.gmMode = 'vector'}>Vector</button>
+              </span>
+            </div>
+
+            <div class="radar-frame">
+              <RadarCanvas bridge={radar.bridge()} />
+            </div>
+
+            {#if radar.selectedEntity}
+              {@const sel = radar.selectedEntity}
+              <div class="palette-row sel-row">
+                <input class="scene-name" value={sel.name} onchange={(e) => radar.updateEntity(sel.id, { name: e.currentTarget.value })} />
+                {#if sel.kind === 'ship'}
+                  <label class="num-label">G <input type="number" class="num" value={sel.accelG} onchange={(e) => radar.updateEntity(sel.id, { accelG: Number(e.currentTarget.value) })} /></label>
+                  <label class="num-label">Fuel <input type="number" class="num" value={sel.fuel} onchange={(e) => radar.updateEntity(sel.id, { fuel: Number(e.currentTarget.value) })} /></label>
+                {/if}
+                <button type="button" class="btn ghost sm" onclick={() => radar.removeEntity(sel.id)}>Delete</button>
+              </div>
+            {:else}
+              <p class="muted">Click a contact to select it; drag to {radar.gmMode === 'vector' ? 'set its velocity (arrow tip = next-turn position)' : 'reposition it'}.</p>
+            {/if}
+
+            <div class="palette-row">
+              {#if radar.engagement.status === 'setup'}
+                <button type="button" class="btn gold" onclick={() => radar.enable()}>Enable engagement</button>
+              {:else}
+                <button type="button" class="btn ghost" onclick={() => radar.end()}>End engagement</button>
+              {/if}
+            </div>
+          {/if}
+        </section>
+      {/if}
 
       <!-- Stage a check -->
       <section class="gm-panel">
@@ -172,4 +240,16 @@
 
   .log-row { font-size: 12px; color: var(--ink-dim); padding: 3px 0; }
   .log-row.dismissed { color: var(--ink-faint); font-style: italic; }
+
+  /* tactical radar panel */
+  .radar-frame { position: relative; height: 480px; border: 1px solid var(--edge); border-radius: 4px; overflow: hidden; margin: 10px 0; background: #070d12; }
+  .palette-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 8px; }
+  .palette-row select, .scene-name { background: #0b141c; border: 1px solid var(--edge); border-radius: 4px; color: var(--ink); padding: 7px 9px; font-family: inherit; }
+  .scene-name { flex: 0 1 220px; }
+  .mode-toggle { margin-left: auto; display: flex; gap: 4px; }
+  .num-label { font-family: 'Chakra Petch', sans-serif; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-dim); display: flex; align-items: center; gap: 5px; }
+  .num { width: 64px; background: #0b141c; border: 1px solid var(--edge); border-radius: 4px; color: var(--ink); padding: 6px 8px; font-family: inherit; }
+  .status-badge { margin-left: 10px; font-size: 9px; letter-spacing: 0.14em; padding: 2px 8px; border-radius: 2px; border: 1px solid var(--edge-bright); color: var(--ink-dim); text-transform: uppercase; }
+  .status-badge.active { color: var(--teal); border-color: var(--teal); }
+  .status-badge.setup { color: var(--gold); border-color: var(--gold); }
 </style>

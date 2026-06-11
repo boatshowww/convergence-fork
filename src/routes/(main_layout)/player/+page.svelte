@@ -14,6 +14,7 @@
   import { makeCheckNet } from '@lib/check/net.js';
   import { PlayerCheck } from './playerCheck.svelte.js';
   import { makeDemoBridge } from '@lib/radar/demo.js';
+  import { RadarController } from '@lib/radar/radarState.svelte.js';
   import CharacterSheet from './components/CharacterSheet.svelte';
   import StarMap from './components/StarMap.svelte';
   import RadarPane from './components/RadarPane.svelte';
@@ -25,8 +26,9 @@
   let net = null;
 
   // Mock sandbox: a demo ship engagement so the radar renders without a GM/DB.
-  // In a real game the radar appears when the GM enables an engagement (phase 2).
+  // In a real game the radar appears when the GM enables an engagement.
   const demoBridge = makeDemoBridge();
+  let radar = $state(null);
 
   let status = $state('mock'); // mock | loading | ready | error | no-character
   let statusMsg = $state('');
@@ -63,6 +65,9 @@
         check.character = buildCharacterVM(character);
         check.ready = true;
 
+        // radar: receive GM-authored engagements (viewer = the ship owned by our seat)
+        radar = new RadarController({ role: 'player', gameId, seatId: seat.id });
+
         // wire the broadcast channel: emit our attempts, apply the GM's events
         net = makeCheckNet(store, (event, data) => {
           if (event === 'check:gate-staged') check.applyGateStaged(data);
@@ -70,8 +75,10 @@
           else if (event === 'check:resolved') check.applyResolved(data);
           else if (event === 'check:attempt-dismissed') check.applyDismissed(data);
           else if (event === 'check:token-granted' && data.playerId === seat.id) check.grantToken();
+          else if (event.startsWith('radar:')) radar.onEvent(event, data);
         });
         check.attach(net, { playerId: seat.id, characterName: character.name });
+        radar.attach(net);
 
         status = 'ready';
       } catch (e) {
@@ -134,6 +141,8 @@
     <CharacterSheet />
     {#if status === 'mock'}
       <RadarPane bridge={demoBridge} title="Tactical (demo)" subtitle="Hullusta · Refinery District" />
+    {:else if radar?.engagement?.status === 'active'}
+      <RadarPane bridge={radar.bridge()} title="Tactical" subtitle={radar.engagement.name} />
     {:else}
       <StarMap />
     {/if}

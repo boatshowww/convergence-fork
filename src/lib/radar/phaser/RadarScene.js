@@ -53,6 +53,7 @@ export function makeRadarScene(Phaser) {
       this.unsub = this.bridge.subscribe?.(() => this.redraw());
 
       // entity picking: nearest entity within tap radius (world km)
+      this.dragId = null;
       this.input.on('pointerdown', (pointer) => {
         const eng = this.bridge.getEngagement();
         if (!eng) return;
@@ -65,7 +66,28 @@ export function makeRadarScene(Phaser) {
         }
         this.selectedId = best?.id ?? null;
         this.bridge.onSelect?.(this.selectedId);
+        if (this.bridge.gm && best) this.dragId = best.id; // GM: start drag on the picked entity
         this.drawSelection();
+      });
+
+      // GM drag: move the entity (mode 'move') or set its velocity vector (mode
+      // 'vector' — the arrow tip is where it will be in one turn, so dragging the
+      // drift point feels natural).
+      this.input.on('pointermove', (pointer) => {
+        if (!this.dragId || !this.bridge.gm || !pointer.isDown) return;
+        const eng = this.bridge.getEngagement();
+        const e = eng?.entities.find((x) => x.id === this.dragId);
+        if (!e) return;
+        const wp = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
+        if (this.bridge.gm.getMode() === 'vector') {
+          this.bridge.gm.onDragVector(e.id, (wp.x - e.x) / TURN_SECONDS, (wp.y - e.y) / TURN_SECONDS);
+        } else {
+          this.bridge.gm.onDragMove(e.id, wp.x, wp.y);
+        }
+      });
+      this.input.on('pointerup', () => {
+        if (this.dragId && this.bridge.gm) this.bridge.gm.onDragEnd(this.dragId);
+        this.dragId = null;
       });
 
       this.scale.on('resize', () => { this.fitCamera(); this.redraw(); });

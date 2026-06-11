@@ -24,7 +24,7 @@ export function makeCheckNet(store, onEvent) {
   const handler = (evt) => {
     const msg = evt?.args; // raw supabase broadcast message: { type, event, payload }
     const event = msg?.event;
-    if (typeof event !== 'string' || !event.startsWith('check:')) return;
+    if (typeof event !== 'string' || !(event.startsWith('check:') || event.startsWith('radar:'))) return;
     const data = msg.payload ?? {};
     if (data.senderId === clientId) return; // ignore our own broadcasts
     onEvent(event, data);
