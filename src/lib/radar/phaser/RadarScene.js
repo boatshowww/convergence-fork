@@ -130,7 +130,9 @@ export function makeRadarScene(Phaser) {
 
       const v = this.viewer();
       const cx = v?.x ?? 0, cy = v?.y ?? 0;
-      this.fitCamera();
+      // don't recenter mid-drag — the camera chasing a dragged viewer ship makes
+      // the world slide under the GM's cursor
+      if (!this.dragId) this.fitCamera();
 
       // range rings around the viewer + draw-distance edge
       for (let r = RING_SPACING_KM; r < DRAW_DISTANCE_KM; r += RING_SPACING_KM) {

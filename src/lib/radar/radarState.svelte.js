@@ -190,8 +190,14 @@ export class RadarController {
   }
 
   get viewerEntityId() {
-    if (this.role !== 'player' || !this.engagement) return null;
-    return this.engagement.entities.find((e) => e.ownerSeatId === this.seatId)?.id ?? null;
+    if (!this.engagement) return null;
+    if (this.role === 'player') {
+      return this.engagement.entities.find((e) => e.ownerSeatId === this.seatId)?.id ?? null;
+    }
+    // GM: keep the radar centered on the player flagship (first crewed ship) so
+    // the action can't drift out of the viewport; fall back to any ship.
+    const ships = this.engagement.entities.filter((e) => e.kind === 'ship');
+    return (ships.find((e) => e.ownerSeatId != null) ?? ships[0])?.id ?? null;
   }
 
   get selectedEntity() {
