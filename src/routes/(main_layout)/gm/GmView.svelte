@@ -5,15 +5,21 @@
   // implicit (total vs DC); the GM supplies the narration.
   import { getPath } from '@utils/navigation';
   import RadarCanvas from '@lib/radar/RadarCanvas.svelte';
+  import { SHIP_ARCHETYPES, archetypeEntityProps } from '@lib/radar/archetypes.js';
 
   let { status = 'loading', statusMsg = '', gameName = 'Game', gameId = null, hasCharacter = false, gm, radar = null, seats = [] } = $props();
 
   // tactical scene authoring
   let sceneName = $state('Engagement');
   let shipSeatId = $state('');
+  let bogeyArchetype = $state('pirate-sloop');
   function addShip() {
     const seat = seats.find((s) => String(s.id) === String(shipSeatId));
     radar.addEntity({ kind: 'ship', name: seat?.label ?? 'Ship', ownerSeatId: seat?.id ?? null, vx: 40, vy: 0 });
+  }
+  function addBogey() {
+    const props = archetypeEntityProps(bogeyArchetype);
+    radar.addEntity({ kind: 'bogey', vx: -50, vy: 20, ...props });
   }
 
   // staging form
@@ -64,7 +70,10 @@
                 {#each seats as s}<option value={s.id}>{s.label}</option>{/each}
               </select>
               <button type="button" class="btn ghost" disabled={!shipSeatId} onclick={addShip}>+ Ship</button>
-              <button type="button" class="btn ghost" onclick={() => radar.addEntity({ kind: 'bogey', name: 'Bogey', vx: -50, vy: 20 })}>+ Bogey</button>
+              <select bind:value={bogeyArchetype} title="Bogey archetype">
+                {#each SHIP_ARCHETYPES as a}<option value={a.key}>{a.label}</option>{/each}
+              </select>
+              <button type="button" class="btn ghost" onclick={addBogey}>+ Bogey</button>
               <button type="button" class="btn ghost" onclick={() => radar.addEntity({ kind: 'debris', name: 'Debris', vx: 5, vy: -3 })}>+ Debris</button>
               <button type="button" class="btn ghost" onclick={() => radar.addEntity({ kind: 'object', name: 'Object', vx: 0, vy: 0 })}>+ Object</button>
               <span class="mode-toggle">
@@ -85,6 +94,9 @@
                 {#if sel.kind === 'ship' || sel.kind === 'bogey'}
                   <label class="num-label">G <input type="number" class="num" value={sel.accelG} onchange={(e) => radar.updateEntity(sel.id, { accelG: Number(e.currentTarget.value) })} /></label>
                   <label class="num-label">Fuel <input type="number" class="num" value={sel.fuel} onchange={(e) => radar.updateEntity(sel.id, { fuel: Number(e.currentTarget.value) })} /></label>
+                  <label class="num-label">Top <input type="number" class="num" value={sel.topSpeed ?? ''} placeholder="∞" onchange={(e) => radar.updateEntity(sel.id, { topSpeed: e.currentTarget.value === '' ? null : Number(e.currentTarget.value) })} /></label>
+                  <label class="num-label">Cargo <input type="number" class="num sm" value={sel.cargoBays ?? 0} onchange={(e) => radar.updateEntity(sel.id, { cargoBays: Number(e.currentTarget.value) })} /></label>
+                  <label class="num-label">Wpn <input type="number" class="num sm" value={sel.weaponPorts ?? 0} onchange={(e) => radar.updateEntity(sel.id, { weaponPorts: Number(e.currentTarget.value) })} /></label>
                 {/if}
                 <button type="button" class="btn ghost sm" onclick={() => radar.removeEntity(sel.id)}>Delete</button>
               </div>
@@ -256,6 +268,7 @@
   .mode-toggle { margin-left: auto; display: flex; gap: 4px; }
   .num-label { font-family: 'Chakra Petch', sans-serif; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-dim); display: flex; align-items: center; gap: 5px; }
   .num { width: 64px; background: #0b141c; border: 1px solid var(--edge); border-radius: 4px; color: var(--ink); padding: 6px 8px; font-family: inherit; }
+  .num.sm { width: 48px; }
   .status-badge { margin-left: 10px; font-size: 9px; letter-spacing: 0.14em; padding: 2px 8px; border-radius: 2px; border: 1px solid var(--edge-bright); color: var(--ink-dim); text-transform: uppercase; }
   .status-badge.active { color: var(--teal); border-color: var(--teal); }
   .status-badge.setup { color: var(--gold); border-color: var(--gold); }

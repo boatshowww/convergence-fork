@@ -55,6 +55,18 @@ describe('evaluateManeuver (mockup HUD numbers)', () => {
     expect(m.valid).toBe(false);
   });
 
+  it('top speed caps the envelope: a freighter cannot sprint, a sloop can', () => {
+    // 60 km/s requires reaching 900 km in a turn
+    const target = { x: 900, y: 0 };
+    // same high G rating for both so the check isolates the top-speed cap
+    const freighter = ship({ topSpeed: 45, accelG: 9, vx: 40 });
+    const sloop = ship({ topSpeed: 95, accelG: 9, vx: 40 });
+    expect(evaluateManeuver(freighter, target).valid).toBe(false); // 60 > 45 top speed
+    expect(evaluateManeuver(sloop, target).valid).toBe(true);
+    // entities without a topSpeed (legacy/default) are uncapped
+    expect(evaluateManeuver(ship({ vx: 40 }), target).valid).toBe(true);
+  });
+
   it('exit direction reorients the new velocity at the same speed', () => {
     const m = evaluateManeuver(ship(), { x: 690, y: 0 }, { x: 0, y: 1 });
     expect(m.newVel.vx).toBeCloseTo(0, 6);

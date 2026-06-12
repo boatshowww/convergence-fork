@@ -39,8 +39,10 @@ export const plotBounds = (entity, t = TURN_SECONDS) => ({
  * (defaults to the travel direction). Returns the HUD numbers + validity.
  * - newVel: exit velocity (direction = exitDir, magnitude = avg speed to reach target)
  * - gForce: velocity-change intensity in G (game-feel: Δv / DELTA_V_PER_G)
- * - fuelCost: % of tank
- * - valid: inside plot bounds AND within the ship's thrust rating
+ * - fuelCost: fuel units (capacity is the entity's tank size)
+ * - valid: inside plot bounds, within the ship's thrust rating, within its top
+ *   speed (archetype balance axis: a freighter physically cannot sprint), and
+ *   affordable from the remaining tank
  */
 export function evaluateManeuver(entity, target, exitDir = null, t = TURN_SECONDS) {
   const dx = target.x - entity.x;
@@ -59,7 +61,9 @@ export function evaluateManeuver(entity, target, exitDir = null, t = TURN_SECOND
   const gForce = deltaV / DELTA_V_PER_G;
   const fuelCost = deltaV * FUEL_PER_KMS;
   const bounds = plotBounds(entity, t);
-  const valid = dist <= bounds.radius && gForce <= (entity.accelG ?? 0) && fuelCost <= (entity.fuel ?? 0);
+  const withinTopSpeed = entity.topSpeed == null || newSpeed <= entity.topSpeed;
+  const valid = dist <= bounds.radius && gForce <= (entity.accelG ?? 0)
+    && fuelCost <= (entity.fuel ?? 0) && withinTopSpeed;
 
   return { target: { ...target }, newVel, newSpeed, deltaV, gForce, fuelCost, valid };
 }

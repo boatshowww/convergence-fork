@@ -57,8 +57,12 @@ export function createEngagement({ kind = 'ship', name = 'Engagement' } = {}) {
 export function createEntity({
   kind = 'ship', name = 'Contact', x = 0, y = 0, vx = 0, vy = 0,
   ownerSeatId = null, accelG = 8, fuel = 100,
+  topSpeed = null, cargoBays = 0, weaponPorts = 0, archetype = null,
 } = {}) {
-  return { id: uid('ent'), kind, name, x, y, vx, vy, ownerSeatId, accelG, fuel };
+  return {
+    id: uid('ent'), kind, name, x, y, vx, vy, ownerSeatId, accelG, fuel,
+    topSpeed, cargoBays, weaponPorts, archetype,
+  };
 }
 
 /** Plain-object snapshot of an engagement (broadcast / localStorage safe). */
