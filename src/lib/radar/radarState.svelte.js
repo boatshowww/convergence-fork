@@ -15,7 +15,7 @@
  *   player→GM: radar:sync-request {}
  * (P3 adds plot/turn events; P5 adds radar:fog.)
  */
-import { createEngagement, createEntity, snapshotEngagement } from './model.js';
+import { createEngagement, createEntity, snapshotEngagement, clampVelocity } from './model.js';
 import { evaluateManeuver, resolveTurn } from './maneuver.js';
 
 const storageKey = (gameId) => `radar:scene:${gameId}`;
@@ -79,7 +79,11 @@ export class RadarController {
       gm: this.role === 'gm' ? {
         getMode: () => this.gmMode,
         onDragMove: (id, x, y) => this.updateEntity(id, { x, y }, { silent: true }),
-        onDragVector: (id, vx, vy) => this.updateEntity(id, { vx, vy }, { silent: true }),
+        onDragVector: (id, vx, vy) => {
+          // hull limit: the drag can't set a velocity beyond the contact's top speed
+          const e = this.engagement?.entities.find((x) => x.id === id);
+          this.updateEntity(id, clampVelocity(e, vx, vy), { silent: true });
+        },
         onDragEnd: (id) => this._afterMutation(this.engagement?.entities.find((e) => e.id === id)),
       } : null,
       player: this.role === 'player' ? {
@@ -208,6 +212,7 @@ export class RadarController {
     // spawn offset so stacked adds don't overlap at origin
     const n = this.engagement.entities.length;
     const entity = createEntity({ x: (n % 5) * 400 - 800, y: Math.floor(n / 5) * 400 - 400, ...props });
+    Object.assign(entity, clampVelocity(entity, entity.vx, entity.vy)); // spawn within hull limit
     this.engagement.entities.push(entity);
     this.selectedId = entity.id;
     this._afterMutation(entity);

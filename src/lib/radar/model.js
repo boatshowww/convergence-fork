@@ -72,3 +72,16 @@ export function snapshotEngagement(eng) {
 
 export const speedOf = (e) => Math.hypot(e.vx, e.vy);
 export const distanceBetween = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+
+/**
+ * Clamp a velocity to an entity's top speed (archetype hull limit). Returns the
+ * (possibly scaled) {vx, vy}; entities without a topSpeed pass through unchanged.
+ */
+export function clampVelocity(entity, vx, vy) {
+  const top = entity?.topSpeed;
+  if (top == null) return { vx, vy };
+  const s = Math.hypot(vx, vy);
+  if (s <= top || s === 0) return { vx, vy };
+  const k = top / s;
+  return { vx: vx * k, vy: vy * k };
+}

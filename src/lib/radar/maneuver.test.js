@@ -93,3 +93,18 @@ describe('driftStep / resolveTurn (WEGO)', () => {
     expect(B.y).toBe(1000 - 150); // drifted
   });
 });
+
+describe('clampVelocity (GM vector drag / spawn hull limit)', () => {
+  it('scales an over-limit velocity down to top speed, preserving direction', async () => {
+    const { clampVelocity } = await import('./model.js');
+    const freighter = { topSpeed: 45 };
+    const v = clampVelocity(freighter, 60, 80); // 100 km/s requested
+    expect(Math.hypot(v.vx, v.vy)).toBeCloseTo(45, 6);
+    expect(v.vx / v.vy).toBeCloseTo(60 / 80, 6); // direction preserved
+  });
+  it('passes through under-limit and uncapped velocities', async () => {
+    const { clampVelocity } = await import('./model.js');
+    expect(clampVelocity({ topSpeed: 45 }, 10, 0)).toEqual({ vx: 10, vy: 0 });
+    expect(clampVelocity({ topSpeed: null }, 500, 0)).toEqual({ vx: 500, vy: 0 });
+  });
+});
