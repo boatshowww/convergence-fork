@@ -23,7 +23,25 @@
     <RadarCanvas {bridge} />
 
     {#if radar}
-      {#if ps}
+      {#if radar.actionMenu}
+        <div class="hud menu">
+          <div class="hud-stage">Ship actions</div>
+          <div class="hud-actions">
+            <button type="button" class="hbtn go" onclick={() => { radar.actionMenu = false; radar.beginPlot(radar.viewerEntityId); }}>Plot Course</button>
+            <button type="button" class="hbtn go" onclick={() => radar.beginTarget('weapons')}>Target Weapons</button>
+            <button type="button" class="hbtn go" onclick={() => radar.beginTarget('network')}>Network Attack</button>
+            <button type="button" class="hbtn" disabled title="Coming soon">Redirect Shields</button>
+            <button type="button" class="hbtn" onclick={() => radar.actionMenu = false}>✕</button>
+          </div>
+        </div>
+      {:else if radar.targeting}
+        <div class="hud">
+          <div class="hud-stage">{radar.targeting.action === 'weapons' ? 'Target Weapons' : 'Network Attack'} — select a contact</div>
+          <div class="hud-actions">
+            <button type="button" class="hbtn" onclick={() => radar.cancelTarget()}>Cancel</button>
+          </div>
+        </div>
+      {:else if ps}
         <div class="hud">
           <div class="hud-stage">
             {#if ps.stage === 'target'}Plot course — select a point within bounds
@@ -80,6 +98,8 @@
     white-space: nowrap;
   }
   .hud.locked { border-color: var(--teal-dim); }
+  .hud.menu { border-color: var(--edge-bright); }
+  .hbtn:disabled { opacity: 0.35; cursor: not-allowed; }
   .hud-stage {
     font-family: 'Chakra Petch', sans-serif;
     font-size: 10px;

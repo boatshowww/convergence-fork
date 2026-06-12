@@ -55,7 +55,9 @@ export class GmCheck {
       attemptId: d.attemptId, gateId: d.gateId ?? null,
       playerId: d.playerId, characterName: d.characterName ?? 'Player',
       skill: d.skill, total: d.total, crit: !!d.crit, fail: !!d.fail,
-      dc: this._dcFor(d.gateId, d.skill) ?? '', // pre-fill from a staged gate, else blank
+      radar: d.radar ?? null, // radar combat action context (target, geometry)
+      // DC pre-fill priority: staged gate -> radar geometry suggestion -> blank
+      dc: this._dcFor(d.gateId, d.skill) ?? d.radar?.suggestedDc ?? '',
       narration: '',
     });
   }

@@ -121,11 +121,15 @@ export class PlayerCheck {
       return;
     }
 
+    const radar = opts.radar ?? null; // radar combat action context (P4)
     const item = {
       id: uid('c'), attemptId: this._attemptId(), gateId: opts.gateId ?? null,
       kind: 'roll', source: 'player', skill: name, state: 'pending',
       d15, luck, total: d15.total, cosmicUsed: false, ejected: false, cosmic: null, band: null,
-      note: 'Waiting for the GM to narrate the outcome. The cosmic window stays open until they do.',
+      radar,
+      note: radar
+        ? `${radar.actionLabel} → ${radar.targetName}. Solution is with the GM.`
+        : 'Waiting for the GM to narrate the outcome. The cosmic window stays open until they do.',
     };
     this.stream.push(item);
     this.pending[name] = item.id;
@@ -134,6 +138,7 @@ export class PlayerCheck {
       attemptId: item.attemptId, gateId: item.gateId,
       playerId: this.me.playerId, characterName: this.character?.name ?? this.me.characterName ?? 'Player',
       skill: name, total: item.total, crit: d15.crit, fail: d15.fail,
+      radar,
     });
   }
 

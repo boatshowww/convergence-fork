@@ -17,6 +17,7 @@
  */
 import { createEngagement, createEntity, snapshotEngagement, clampVelocity } from './model.js';
 import { evaluateManeuver, resolveTurn } from './maneuver.js';
+import { suggestDc, ACTION_SKILLS, ACTION_LABELS } from './difficulty.js';
 
 const storageKey = (gameId) => `radar:scene:${gameId}`;
 
@@ -35,6 +36,12 @@ export class RadarController {
   myPlot = $state(null);
   /** GM: confirmed plots received this turn, entityId -> plot. */
   plots = $state({});
+  /** Player: ship action menu open (after tapping own ship). */
+  actionMenu = $state(false);
+  /** Player: target-pick mode: null | { action: 'weapons'|'network' }. */
+  targeting = $state(null);
+  /** Host hook: called with the assembled action payload when a target is picked. */
+  onAction = null;
 
   constructor({ role, gameId = null, seatId = null }) {
     this.role = role; // 'gm' | 'player'
@@ -95,13 +102,49 @@ export class RadarController {
   }
 
   _handleSelect(id) {
-    this.selectedId = id;
-    // Player: tapping your own ship during planning starts plotting a course.
-    // (P4 turns this into the full action menu; Plot Course remains the default.)
-    if (this.role === 'player' && id && id === this.viewerEntityId
-        && this.engagement?.phase === 'planning' && !this.plotState && !this.myPlot) {
-      this.beginPlot(id);
+    // targeting mode: the next tapped contact is the target
+    if (this.role === 'player' && this.targeting) {
+      if (id && id !== this.viewerEntityId) this.completeTarget(id);
+      return;
     }
+    this.selectedId = id;
+    // Player: tapping your own ship opens the action menu (mockup: Plot Course /
+    // Target Weapons / Network Attack / Redirect Shields).
+    if (this.role === 'player' && id && id === this.viewerEntityId && !this.plotState) {
+      this.actionMenu = true;
+    } else {
+      this.actionMenu = false;
+    }
+  }
+
+  // ---------- player: combat actions → the check system ----------
+  beginTarget(action) {
+    this.actionMenu = false;
+    this.targeting = { action };
+    this._notify();
+  }
+
+  cancelTarget() { this.targeting = null; this._notify(); }
+
+  completeTarget(targetId) {
+    const action = this.targeting?.action;
+    const me = this.engagement?.entities.find((e) => e.id === this.viewerEntityId);
+    const target = this.engagement?.entities.find((e) => e.id === targetId);
+    if (!action || !me || !target) { this.targeting = null; return; }
+    const { dc, range, relSpeed, breakdown } = suggestDc(action, me, target);
+    this.targeting = null;
+    this._notify();
+    this.onAction?.({
+      action,
+      actionLabel: ACTION_LABELS[action],
+      skill: ACTION_SKILLS[action],
+      targetId,
+      targetName: target.name,
+      suggestedDc: dc,
+      range,
+      relSpeed,
+      breakdown,
+    });
   }
 
   // ---------- player: plot-course state machine (mockup flow) ----------

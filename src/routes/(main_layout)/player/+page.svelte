@@ -31,6 +31,14 @@
   const demoRadar = makeDemoRadar();
   let radar = $state(null);
 
+  // Radar combat actions roll through the existing check system (one pending
+  // check per skill still applies — a second attempt triggers the discard guard).
+  function radarAction(a) {
+    if (check.pending[a.skill]) check.requestDiscard(a.skill);
+    else check.doRoll(a.skill, 'check', { radar: a });
+  }
+  demoRadar.onAction = radarAction;
+
   let status = $state('mock'); // mock | loading | ready | error | no-character
   let statusMsg = $state('');
   let gameId = $state(null);
@@ -68,6 +76,7 @@
 
         // radar: receive GM-authored engagements (viewer = the ship owned by our seat)
         radar = new RadarController({ role: 'player', gameId, seatId: seat.id });
+        radar.onAction = radarAction;
 
         // wire the broadcast channel: emit our attempts, apply the GM's events
         net = makeCheckNet(store, (event, data) => {

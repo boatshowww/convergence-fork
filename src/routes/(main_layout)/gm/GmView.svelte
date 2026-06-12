@@ -166,6 +166,9 @@
                 <span class="q-who">{q.characterName} · {q.skill}</span>
                 <span class="q-total">rolled <b>{q.total}</b>{q.crit ? ' · nat 15' : ''}{q.fail ? ' · nat 1' : ''}</span>
               </div>
+              {#if q.radar}
+                <div class="q-radar">⌖ {q.radar.actionLabel} → {q.radar.targetName} · {q.radar.range} km · Δv {q.radar.relSpeed} km/s · suggested DC {q.radar.suggestedDc} ({q.radar.breakdown})</div>
+              {/if}
               <div class="q-controls">
                 <label class="dc-label">DC <input class="dc-input" type="number" bind:value={q.dc} /></label>
                 {#if gm.bandFor(q)}
@@ -245,6 +248,7 @@
   .q-who { font-family: 'Chakra Petch', sans-serif; font-size: 13px; letter-spacing: 0.03em; color: var(--ink); }
   .q-total { font-family: 'Chakra Petch', sans-serif; font-size: 12px; color: var(--ink-dim); }
   .q-total b { color: var(--ink); font-size: 14px; }
+  .q-radar { font-family: 'Chakra Petch', sans-serif; font-size: 11px; color: var(--gold); margin: -2px 0 8px; }
   .q-controls { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
   .dc-label { font-family: 'Chakra Petch', sans-serif; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-dim); display: flex; align-items: center; gap: 6px; }
   .dc-input { width: 64px; background: #0b141c; border: 1px solid var(--edge-bright); border-radius: 4px; color: var(--ink); padding: 6px 8px; font-family: inherit; }
