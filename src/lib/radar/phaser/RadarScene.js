@@ -24,6 +24,7 @@ export const COLORS = {
   ship: 0x9ad7e8,  // other friendly ships
   bogey: 0xe8b667, // gold — unknown/hostile
   debris: 0x6f8d97,
+  object: 0xa78fd6, // violet — custom GM-authored contacts (stations, asteroids, …)
   label: 0xcfe6ec,
   dim: 0x456069,
 };
@@ -145,6 +146,16 @@ export function makeRadarScene(Phaser) {
         this.gRings.strokeCircle(v.x, v.y, navigableRadius(v));
       }
 
+      // GM: show the selected powered contact's maneuver envelope (bogeys too)
+      if (this.bridge.gm && this.selectedId) {
+        const sel = eng.entities.find((x) => x.id === this.selectedId);
+        if (sel && (sel.kind === 'ship' || sel.kind === 'bogey')) {
+          const color = this.entityColor(sel, v);
+          this.gRings.lineStyle(1.2 / this.cameras.main.zoom, color, 0.45);
+          this.gRings.strokeCircle(sel.x, sel.y, navigableRadius(sel));
+        }
+      }
+
       for (const e of eng.entities) this.drawEntity(e, v);
       this.drawPlots(eng);
       this.drawPlotting();
@@ -251,6 +262,10 @@ export function makeRadarScene(Phaser) {
       g.lineStyle(px(1.5), color, 1);
       if (e.kind === 'debris') {
         g.fillCircle(e.x, e.y, px(4));
+      } else if (e.kind === 'object') {
+        const s = px(7); // square outline — fixed installation / custom contact
+        g.strokeRect(e.x - s, e.y - s, s * 2, s * 2);
+        g.fillCircle(e.x, e.y, px(2));
       } else if (e.kind === 'bogey') {
         const s = px(9); // diamond
         g.beginPath();

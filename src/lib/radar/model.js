@@ -17,8 +17,14 @@ export const TURN_SECONDS = 15;
 /** Range-ring spacing on the radar display. */
 export const RING_SPACING_KM = 1000;
 
-/** Entity kinds for ship engagements (character mode reuses the same shape later). */
-export const ENTITY_KINDS = ['ship', 'bogey', 'debris'];
+/**
+ * Entity kinds for ship engagements (character mode reuses the same shape later).
+ * 'object' = custom GM-authored contact (station, asteroid, marker, …).
+ */
+export const ENTITY_KINDS = ['ship', 'bogey', 'debris', 'object'];
+
+/** Kinds with engines: they have maneuver characteristics (accelG, fuel) and can plot. */
+export const POWERED_KINDS = ['ship', 'bogey'];
 
 let seq = 0;
 const uid = (p) => `${p}${Date.now().toString(36)}${(++seq).toString(36)}`;

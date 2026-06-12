@@ -66,6 +66,7 @@
               <button type="button" class="btn ghost" disabled={!shipSeatId} onclick={addShip}>+ Ship</button>
               <button type="button" class="btn ghost" onclick={() => radar.addEntity({ kind: 'bogey', name: 'Bogey', vx: -50, vy: 20 })}>+ Bogey</button>
               <button type="button" class="btn ghost" onclick={() => radar.addEntity({ kind: 'debris', name: 'Debris', vx: 5, vy: -3 })}>+ Debris</button>
+              <button type="button" class="btn ghost" onclick={() => radar.addEntity({ kind: 'object', name: 'Object', vx: 0, vy: 0 })}>+ Object</button>
               <span class="mode-toggle">
                 <button type="button" class="btn sm {radar.gmMode === 'move' ? 'gold' : 'ghost'}" onclick={() => radar.gmMode = 'move'}>Move</button>
                 <button type="button" class="btn sm {radar.gmMode === 'vector' ? 'gold' : 'ghost'}" onclick={() => radar.gmMode = 'vector'}>Vector</button>
@@ -80,7 +81,8 @@
               {@const sel = radar.selectedEntity}
               <div class="palette-row sel-row">
                 <input class="scene-name" value={sel.name} onchange={(e) => radar.updateEntity(sel.id, { name: e.currentTarget.value })} />
-                {#if sel.kind === 'ship'}
+                <span class="speed-chip">{Math.round(Math.hypot(sel.vx, sel.vy))} km/s</span>
+                {#if sel.kind === 'ship' || sel.kind === 'bogey'}
                   <label class="num-label">G <input type="number" class="num" value={sel.accelG} onchange={(e) => radar.updateEntity(sel.id, { accelG: Number(e.currentTarget.value) })} /></label>
                   <label class="num-label">Fuel <input type="number" class="num" value={sel.fuel} onchange={(e) => radar.updateEntity(sel.id, { fuel: Number(e.currentTarget.value) })} /></label>
                 {/if}
@@ -260,4 +262,5 @@
   .turn-chip { font-family: 'Chakra Petch', sans-serif; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink); }
   .ready-chip { font-family: 'Chakra Petch', sans-serif; font-size: 10px; letter-spacing: 0.06em; padding: 3px 9px; border: 1px solid var(--edge); border-radius: 2px; color: var(--ink-faint); }
   .ready-chip.ready { color: var(--teal); border-color: var(--teal-dim); }
+  .speed-chip { font-family: 'Chakra Petch', sans-serif; font-size: 11px; letter-spacing: 0.05em; color: var(--ink-dim); }
 </style>
