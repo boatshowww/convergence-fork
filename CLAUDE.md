@@ -129,6 +129,35 @@ the spec; the rest is compressed Excalidraw JSON).
   strokes) · P6 polish. Radar `check:attempt`s carry `{action, targetId, suggestedDc}`.
 - Mock `/player` center pane shows a **demo engagement** (headless-verifiable); real games show
   the radar when the GM enables an engagement (P2+). Proposed: `ALTER TABLE public.character ADD COLUMN cosmic_tokens smallint NOT NULL DEFAULT 0;` (cap of 2 still enforced in code). Flag explicitly + give Studio steps before wiring read/write.
+- **Exit-trajectory legibility (2026-06-17):** at the plot exit stage the scene draws the reachable
+  **exit-heading arc** (`RadarScene.drawExitOptions`) — bright teal = reachable, faint red = beyond
+  thrust — because exit *speed* is fixed by the target and only heading varies, within Δv budget.
+- **Player-ship hull fix (2026-06-17):** GM-spawned player ships get `PLAYER_SHIP_DEFAULT`
+  (`archetypes.js`) so the vector drag clamps to a real `topSpeed`; spawn at scene center. This is a
+  labeled DEMO interim — real player ships come from the deferred **ship-inventory** initiative (GM
+  authors/customizes ships → assigns to players; radar reads the owned `ship` record).
+
+#### COMBAT DESIGN (defined 2026-06-17; docs are Scott's, living + incomplete) — READ THE TWO DOCS
+The radar is the combat centerpiece; combat is now spec'd in two **new, evolving** docs (Scott owns
+them — extend, don't freeze): `docs/Architecture/Mockups/SHIP_COMBAT_UX.md` (the flow) +
+`docs/Reference/Ship Weapons.md` (weapon/ammo catalog = balance levers). Grounded in Scott's GM
+Mockup / GDD / class diagram. **Scott's decisions (this session):**
+- **Stations, not "tap ship → all actions":** five stations from the GM Mockup — **Helm · Targeting ·
+  Shields · Network · Comms**. Each player mans ONE; one action/turn. **Unmanned station → ship AI
+  default check.** Identical for player ships and GM bogeys.
+- **GM plays the bogeys (symmetry GAP today):** tapping a GM-owned bogey must open the same
+  station/action menu + join WEGO planning. Currently only a player tapping their *own* ship opens a menu.
+- **Weapons are equipped, not implied by ports:** a hull has **weapon docks** (may be empty); the
+  equipped **weapon type + ammo + targeting** decide the interaction. GDD rule: **shields stop ENERGY,
+  not kinetic/ordnance** (energy→shields-first; kinetic/ordnance→hull). Damage scales off the to-hit band.
+- **Scan-to-reveal:** enemy hull/shields/loadout hidden (`?? / ??`) until a successful scan.
+- **Batch resolution at Execute Turn** (not the interactive per-check queue — that stays for *non-combat*
+  skill checks). Hidden DC + no-bare-success still hold; players get narrated bands + their own bars moving.
+- **No schema change:** radar entity gains `hull/shields/stations/weaponDocks/scannedBy` (GM-authoritative,
+  ephemeral; persisted `ship` table already has hp/shields for the future migration).
+- **Open design Qs for Scott** (in the docs): Gunnery skill vs reuse Heavy Weapons; subsystem-crit depth;
+  ammo bookkeeping in v1; kinetic ignores shields entirely vs token fraction; Scan at Network vs Comms;
+  players self-assign stations vs GM-only. Build order C1–C6 in SHIP_COMBAT_UX.md (after radar P5/P6).
 3. *(Later)* migrate off the broadcast scaffold to the persisted model (see INTENDED FUTURE ARCHITECTURE); retire `Check.svelte` for checks.
 
 **TEST DATA / INFRA (seeded in the live DB — DML only, NOT in git):**

@@ -13,7 +13,7 @@
  * receives the Phaser namespace and returns the Scene class.
  */
 import { DRAW_DISTANCE_KM, RING_SPACING_KM, TURN_SECONDS, speedOf } from '../model.js';
-import { navigableRadius, plotBounds } from '../maneuver.js';
+import { navigableRadius, plotBounds, evaluateManeuver } from '../maneuver.js';
 
 // Aeterna palette (matches the app CSS vars)
 export const COLORS = {
@@ -204,6 +204,8 @@ export function makeRadarScene(Phaser) {
       }
       if (ps.stage !== 'target' && ps.target) {
         this.dashedLine(this.gPlot, e.x, e.y, ps.target.x, ps.target.y, px(10), COLORS.own, 0.9, px(1.5));
+        // the reachable exit-heading arc (why turning is limited — see method doc)
+        this.drawExitOptions(e, ps.target, px);
         this.gPlot.fillStyle(COLORS.own, 1);
         this.gPlot.fillCircle(ps.target.x, ps.target.y, px(5));
         // exit trajectory: from the locked target toward the hover (or confirmed dir)
@@ -212,6 +214,32 @@ export function makeRadarScene(Phaser) {
           y: ps.target.y + ps.maneuver.newVel.vy * TURN_SECONDS,
         } : null);
         if (dir) this.arrow(this.gPlot, ps.target.x, ps.target.y, dir.x, dir.y, color, 0.9, px(1.5));
+      }
+    }
+
+    /**
+     * The reachable exit-heading arc at the exit stage. Exit *speed* is fixed by the
+     * chosen target (speed = reach ÷ turn); only the *heading* can change, and only
+     * within the thrust budget (|Δvelocity| ≤ accel_G · DELTA_V_PER_G). That valid set
+     * is an arc of the circle of possible velocity-arrow tips (radius = entity→target
+     * distance, centered on the target). Bright teal = reachable headings; faint red =
+     * beyond thrust — making "why can't I turn further" legible.
+     */
+    drawExitOptions(e, target, px) {
+      const R = Math.hypot(target.x - e.x, target.y - e.y); // exit speed × turn
+      if (R < 1) return;
+      const STEPS = 144;
+      let prev = null, prevValid = null;
+      for (let i = 0; i <= STEPS; i++) {
+        const a = (i / STEPS) * Math.PI * 2;
+        const valid = evaluateManeuver(e, target, { x: Math.cos(a), y: Math.sin(a) }).valid;
+        const tip = { x: target.x + Math.cos(a) * R, y: target.y + Math.sin(a) * R };
+        if (prev != null) {
+          if (prevValid && valid) this.gPlot.lineStyle(px(3), COLORS.own, 0.85);
+          else this.gPlot.lineStyle(px(1), 0xd05a4f, 0.22);
+          this.gPlot.lineBetween(prev.x, prev.y, tip.x, tip.y);
+        }
+        prev = tip; prevValid = valid;
       }
     }
 

@@ -5,7 +5,7 @@
   // implicit (total vs DC); the GM supplies the narration.
   import { getPath } from '@utils/navigation';
   import RadarCanvas from '@lib/radar/RadarCanvas.svelte';
-  import { SHIP_ARCHETYPES, archetypeEntityProps } from '@lib/radar/archetypes.js';
+  import { SHIP_ARCHETYPES, archetypeEntityProps, PLAYER_SHIP_DEFAULT } from '@lib/radar/archetypes.js';
 
   let { status = 'loading', statusMsg = '', gameName = 'Game', gameId = null, hasCharacter = false, gm, radar = null, seats = [] } = $props();
 
@@ -15,7 +15,9 @@
   let bogeyArchetype = $state('pirate-sloop');
   function addShip() {
     const seat = seats.find((s) => String(s.id) === String(shipSeatId));
-    radar.addEntity({ kind: 'ship', name: seat?.label ?? 'Ship', ownerSeatId: seat?.id ?? null, vx: 40, vy: 0 });
+    // Fixed spawn at scene center (the GM camera also tracks the flagship), with a
+    // real default hull so the velocity-vector drag is clamped to its top speed.
+    radar.addEntity({ kind: 'ship', name: seat?.label ?? 'Ship', ownerSeatId: seat?.id ?? null, x: 0, y: 0, vx: 40, vy: 0, ...PLAYER_SHIP_DEFAULT });
   }
   function addBogey() {
     const props = archetypeEntityProps(bogeyArchetype);

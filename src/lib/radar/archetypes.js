@@ -18,6 +18,16 @@ export const SHIP_ARCHETYPES = [
   { key: 'battle-barge', label: 'Battle Barge', shipClass: 'Battleship', topSpeed: 35, accelG: 2, fuel: 220, cargoBays: 2, weaponPorts: 12, notes: 'A wall of guns. Glacial.' },
 ];
 
+/**
+ * INTERIM/DEMO ONLY. A player ship's stats should come from a persisted, player-
+ * owned `ship` record (GM authors & customizes ships, then assigns them to a
+ * player/crew — e.g. on purchase). Until that ship-inventory model exists, a
+ * freshly-spawned player ship gets this fallback hull so it always has real
+ * maneuver limits (notably a `topSpeed`, so the GM's vector drag is clamped like a
+ * bogey's). Remove once spawn pulls stats from the assigned ship record.
+ */
+export const PLAYER_SHIP_DEFAULT = { archetype: 'player-cutter', topSpeed: 90, accelG: 8, fuel: 100, cargoBays: 2, weaponPorts: 3 };
+
 export const getArchetype = (key) => SHIP_ARCHETYPES.find((a) => a.key === key) ?? null;
 
 /** Entity props for spawning a contact from an archetype. */
