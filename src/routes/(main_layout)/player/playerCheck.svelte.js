@@ -71,6 +71,11 @@ export class PlayerCheck {
   me = { playerId: null, characterName: null };
   _aseq = 0;
 
+  // Cosmic-token persistence hook: set in game mode to `(tokens) => Promise` that
+  // writes character.cosmic_tokens; null on the mock route (tokens stay ephemeral).
+  persistTokens = null;
+  _saveTokens() { this.persistTokens?.(this.tokens); }
+
   attach(net, me) { this.net = net; this.me = { ...this.me, ...me }; }
   _attemptId() { return `${this.net?.clientId ?? 'mock'}:${++this._aseq}`; }
   _findByAttempt(attemptId) { return this.stream.find((i) => i.attemptId === attemptId); }
@@ -148,6 +153,7 @@ export class PlayerCheck {
     const item = this._find(itemId);
     if (!item || item.state !== 'pending') return;
     this.tokens -= 1;
+    this._saveTokens();
     const prev = item.total;
     const d15 = rollD15();
     const luck = rollLuck(this.luckStat);
@@ -262,5 +268,5 @@ export class PlayerCheck {
     delete this.pending[name];
   }
 
-  grantToken() { this.tokens = Math.min(MAX_COSMIC_TOKENS, this.tokens + 1); }
+  grantToken() { this.tokens = Math.min(MAX_COSMIC_TOKENS, this.tokens + 1); this._saveTokens(); }
 }

@@ -43,8 +43,8 @@ Scott has **SSH access to the Supabase VM** and **Proxmox admin access**.
 - **`adapter-static`** → builds a static SPA. Production base path is `/convergence`
   (GitHub Pages); empty in dev. See `svelte.config.js`.
 - **Supabase JS** (`@supabase/supabase-js`) for auth + Postgres (PostgREST) + realtime.
-- **Phaser 3** — installed but **not yet used** in `src/` (reserved for future
-  map/space rendering).
+- **Phaser 3** (3.88.2) — **in use** by the Tactical Radar (`src/lib/radar/phaser/`),
+  dynamically imported client-side (kept out of SSR + the base bundle).
 - **Vitest** (unit) + **Playwright** (e2e).
 - Path aliases: `@src @styles @utils @lib @routes @components` (see `vite.config.js`).
 
@@ -82,8 +82,8 @@ character, character_ability, class_skill, role`.
 
 A player-facing **skill-check interface**. This is the current feature focus.
 
-### STATUS — where we are (updated 2026-06-06) — READ THIS FIRST
-Build sequence: prototype → local slice → real-data → role-aware routing → **broadcast (in progress)** → persistence.
+### STATUS — where we are (updated 2026-06-18) — READ THIS FIRST
+Build sequence: prototype → local slice → real-data → role-aware routing → broadcast ✅ → **persistence: cosmic tokens (code DONE, schema apply pending)**. Focus has since shifted to the **Tactical Radar / ship-combat** initiative below.
 
 **DONE & committed on `main`:**
 - **Dice engine** `src/lib/dice.js` (+ `dice.test.js`, 12 tests): exploding d15, luck d30, `MAX_COSMIC_TOKENS = 2`.
@@ -94,7 +94,7 @@ Build sequence: prototype → local slice → real-data → role-aware routing �
 - **Role-aware routing (Option A):** `/games` lists by **membership** (your player seats) with role badges → routes Player→`/player?game_id=`, GM→`/gm?game_id=`. New `/gm` route + `gm/GmView.svelte` (**scaffold**: stage control + pending-resolutions queue; guards to GM seats).
 - `DataStore.svelte.js`: `SIGNED_IN` redirect gated to neutral pages only (deep links no longer hijacked).
 
-**DONE — broadcast wiring (built 2026-06-07; awaiting the two-browser test):**
+**DONE — broadcast wiring (built 2026-06-07; CONFIRMED working in live two-client testing, 2026-06-18):**
 - `src/lib/check/net.js` — `makeCheckNet(store, onEvent) → {clientId, send, dispose}`; sends on `store.realtimeChannels.broadcast`, receives via `store.on('game-event', …)` (where `event.args` is the raw supabase msg), ignores own `senderId`. Transport verified.
 - **Player** (`playerCheck.svelte.js` + `/player` host): emits `check:attempt` / `-updated` / `-ejected`; applies `gate-staged` / `gate-cancelled` / `resolved` / `attempt-dismissed` / `token-granted`. Each pending attempt carries a global `attemptId`. GM Sim bar now shows **only on the mock route** (no game_id).
 - **GM** (`gm/gmCheck.svelte.js` + rewritten `gm/GmView.svelte` + `/gm` host): stage form with **per-skill DCs** (DCs stay local — only skill NAMES broadcast); live attempt queue; resolve via the **implicit band** (`src/lib/check/bands.js`: +5 crit / −3 partial, + natural 15/1); dismiss; cancel-gate; grant token.
@@ -104,8 +104,14 @@ Build sequence: prototype → local slice → real-data → role-aware routing �
 - Still **ephemeral** (no persistence; refresh resets; late-joiners see nothing prior). Deferred: formal resolution modes (first-success / best-result), "other skill" UX.
 
 **NEXT STEPS:**
-1. Fold in any fixes from the two-browser run.
-2. **Step 3 — persist cosmic tokens (SCHEMA CHANGE Scott applies).**
+1. **Cosmic-token persistence — CODE DONE (2026-06-18); pending the schema apply.**
+   Column: `ALTER TABLE public.character ADD COLUMN cosmic_tokens smallint NOT NULL DEFAULT 0;`
+   (Scott applies in Studio → `npm run db:schema` to snapshot). Wiring: `PlayerCheck.persistTokens`
+   hook + `_saveTokens()` on grant/spend; `store.save_cosmic_tokens(charId, n)`; `/player` loads
+   `character.cosmic_tokens` on ready. Cap (`MAX_COSMIC_TOKENS=2`) stays enforced in code. Until the
+   column exists the UI still works (reads `0`, writes log-and-no-op).
+2. *(Later)* migrate the check lifecycle off the broadcast scaffold to the persisted tables model
+   (see INTENDED FUTURE ARCHITECTURE).
 
 ### INITIATIVE: Tactical Radar (started 2026-06-11) — the combat centerpiece
 Full plan: `~/.claude/plans/zesty-orbiting-willow.md`. Design source:

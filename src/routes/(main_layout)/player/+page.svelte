@@ -73,6 +73,9 @@
 
         check.character = buildCharacterVM(character);
         check.ready = true;
+        // persist the cosmic-token economy on this character row (survives refresh)
+        check.tokens = character.cosmic_tokens ?? 0;
+        check.persistTokens = (n) => store.save_cosmic_tokens(character.id, n);
 
         // radar: receive GM-authored engagements (viewer = the ship owned by our seat)
         radar = new RadarController({ role: 'player', gameId, seatId: seat.id });

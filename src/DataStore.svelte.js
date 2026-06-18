@@ -951,6 +951,18 @@ export default class DataStore {
     await this.supabase.from('character').update({ game_id: null, player_id: null }).eq('id', characterId);
   }
 
+  /**
+   * Persist a character's cosmic-token count (Player Check economy). The cap is
+   * enforced in the UI (MAX_COSMIC_TOKENS); this just writes the current value.
+   * Requires the `character.cosmic_tokens` column (smallint NOT NULL DEFAULT 0).
+   */
+  async save_cosmic_tokens(characterId, tokens) {
+    if (characterId == null) return;
+    const { error } = await this.supabase
+      .from('character').update({ cosmic_tokens: tokens }).eq('id', characterId);
+    if (error) logger.error('store', 'save_cosmic_tokens failed', error);
+  }
+
   async loadMany (table, queryModifier, isSingleton = false) {
     let data, error;
     try {
