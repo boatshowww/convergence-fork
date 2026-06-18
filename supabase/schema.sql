@@ -147,7 +147,7 @@ CREATE TABLE public."character" (
     is_primary boolean DEFAULT false NOT NULL,
     race_id bigint,
     subclass_id bigint,
-    background character varying(255) DEFAULT ''::character varying NOT NULL,
+    background text DEFAULT ''::character varying NOT NULL,
     intelligence smallint DEFAULT 0 NOT NULL,
     dexterity smallint DEFAULT 0 NOT NULL,
     strength smallint DEFAULT 0 NOT NULL,
@@ -187,7 +187,8 @@ CREATE TABLE public."character" (
     first_aid_success_checks integer DEFAULT 0 NOT NULL,
     evasion_success_checks integer DEFAULT 0 NOT NULL,
     education_success_checks integer DEFAULT 0 NOT NULL,
-    user_id uuid
+    user_id uuid,
+    cosmic_tokens smallint DEFAULT 0 NOT NULL
 );
 
 
