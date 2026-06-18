@@ -89,14 +89,16 @@ applied **by weapon type** per `Ship Weapons.md`:
 | **Partial** | half damage (glancing) |
 | **No-read / Fail** | miss — 0 (nat-1 may risk a misfire/jam) |
 
-**Shields vs type (ADR 0003 Q4):** energy → **shields absorb fully**, overflow to
-hull; kinetic → **shields absorb 20%**, the other 80% strikes hull; ordnance →
-**straight to hull**. `hull ≤ 0` → **destroyed** (escape pods). **Shields recover
-only via the Shields station** (Redirect Shields), otherwise slowly/not at all.
+**Shields vs type (ADR 0003 Q4 + ordnance call):** *while shields are up* — energy →
+**fully absorbed** (overflow to hull); kinetic & ordnance → **20% to shields, 80% to
+hull**. *Once shields are depleted* → **all types 100% to hull**. `hull ≤ 0` →
+**destroyed** (escape pods). **Shields recover only via the Shields station** (Redirect
+Shields), otherwise slowly/not at all. (Energy weapons are heat-limited, not reloaded —
+see `Ship Weapons.md` §Heat; Overcharge = 1.5× damage / 2× heat.)
 
 **Subsystem targeting (Q2):** the gunner may aim at a subsystem (Shields / Engines /
-Weapons / a station) at **1.5–2× difficulty**; **if no subsystem is named, a hidden
-roll randomizes which system takes the damage and how much.**
+Weapons / a station) — DC multiplier **Helm = 2×, all others = 1.5×**; **if no
+subsystem is named, a hidden roll randomizes which system takes the damage and how much.**
 
 ## Information & fog
 - **Enemy hull/shields/loadout hidden until scanned** (D5). A successful **Scan**
@@ -111,9 +113,10 @@ roll randomizes which system takes the damage and how much.**
 
 ## What this means for the code (no schema change — GM-authoritative & ephemeral)
 - **Radar entity** (`src/lib/radar/model.js`) gains `hull/maxHull/shields/maxShields`,
-  a `stations` map (station → crew/AI), `weaponDocks[]` (equipped weapon + ammo), and
-  `scannedBy`. (The persisted `ship` table already has hp/shields columns for the
-  future migration; nothing to apply now.)
+  a `stations` map (station → crew/AI), `weaponDocks[]` (equipped weapon + ammo +
+  **heat state** for energy: `heat/heatCap/heatPerShot/coolTurns`), and `scannedBy`.
+  (The persisted `ship` table already has hp/shields columns for the future migration;
+  nothing to apply now.)
 - **GM symmetry:** tapping a GM-owned bogey opens the same station/action menu (and
   the right-pane NPC control); bogey plots + actions join the WEGO turn. (Today only a
   player tapping *their own* ship opens a menu — the gap Scott flagged.)
@@ -136,11 +139,12 @@ C6 Shields/Network/Comms station actions; range/end-condition polish; GM crew le
 - Five stations; **players self-assign** via "MAN BATTLE STATIONS", sticky (exit = a turn).
 - **GM panes:** left = own-crew stats/inventory; right = NPC details + NPC action control.
 - Targeting skill = **Heavy Weapons**; **Scan = Network**; **Evade = distinct Helm action**.
-- **Shields −20% kinetic** (energy fully absorbed, ordnance bypasses).
-- Subsystem targeting **1.5–2×**, untargeted → **random-system** hit.
+- Shields: **energy fully absorbed**; **kinetic & ordnance −20% while up**; **full to hull once depleted**.
+- Subsystem targeting **Helm 2× / all else 1.5×**, untargeted → **random-system** hit.
+- **Energy heat + Overcharge** (1.5× dmg / 2× heat) — new mechanic (see `Ship Weapons.md`).
 - **Infinite ammo** for first playable. **Batch resolution**; **initiative by ship**, narrated in order.
 
 ## Open questions (carry forward — see also `Ship Weapons.md`)
 - Skills for Helm/Shields/Comms stations (Targeting=Heavy Weapons is fixed).
-- Exact subsystem multiplier within the 1.5–2× band; does ordnance also get a shield cut?
+- Per-weapon balance numbers (damage/range/heat) — tune in playtest.
 - Boarding (`boardingAction`, Breaching ammo) — deferred.
