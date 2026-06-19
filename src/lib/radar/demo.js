@@ -5,6 +5,7 @@
  * net attached, confirmed plots simply stay local.
  */
 import { createEngagement, createEntity } from './model.js';
+import { revealCircle } from './fog.js';
 import { RadarController } from './radarState.svelte.js';
 
 const DEMO_SEAT = 'demo-seat';
@@ -21,6 +22,14 @@ export function makeDemoRadar() {
     createEntity({ kind: 'debris', name: 'Debris', x: -600, y: -2600, vx: 3, vy: 9 }),
   );
   eng.status = 'active';
+
+  // Demo fog: a sensor bubble around our ship + a scanned lane out to the bogey, so
+  // the debris drifting in the dark stays hidden — shows fog of war at a glance.
+  eng.fog.enabled = true;
+  revealCircle(eng.fog, 0, 0, 1500);
+  revealCircle(eng.fog, 1400, -900, 1100);
+  revealCircle(eng.fog, 2500, -1500, 900);
+
   radar.engagement = eng;
 
   return radar;

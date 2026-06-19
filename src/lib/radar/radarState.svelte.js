@@ -18,14 +18,17 @@
 import { createEngagement, createEntity, snapshotEngagement, clampVelocity } from './model.js';
 import { evaluateManeuver, resolveTurn } from './maneuver.js';
 import { suggestDc, ACTION_SKILLS, ACTION_LABELS } from './difficulty.js';
+import * as Fog from './fog.js';
 
 const storageKey = (gameId) => `radar:scene:${gameId}`;
 
 export class RadarController {
   engagement = $state(null);
   selectedId = $state(null);
-  /** GM palette interaction mode: 'move' (drag position) | 'vector' (drag velocity) */
+  /** GM palette interaction mode: 'move' (drag position) | 'vector' (drag velocity) | 'fog' (paint reveal) */
   gmMode = $state('move');
+  /** GM fog brush radius (km). */
+  fogBrush = $state(Fog.DEFAULT_BRUSH_KM);
   /**
    * Player plot-course state machine (mockup flow):
    * null | { stage:'target'|'exit'|'confirm', entityId, hover:{x,y}|null,
@@ -64,6 +67,7 @@ export class RadarController {
       else if (event === 'radar:scene-update') this._applyUpdate(data);
       else if (event === 'radar:scene-end') { this.engagement = null; this._notify(); }
       else if (event === 'radar:turn-result') this._applyTurnResult(data);
+      else if (event === 'radar:fog') this._applyFog(data);
     } else if (this.role === 'gm') {
       if (event === 'radar:sync-request') this._broadcastSnapshot();
       else if (event === 'radar:plot') { this.plots[data.entityId] = data.plot; this._notify(); }
@@ -75,6 +79,8 @@ export class RadarController {
     return {
       getEngagement: () => this.engagement,
       getViewerEntityId: () => this.viewerEntityId,
+      getRole: () => this.role,
+      getFog: () => this.engagement?.fog ?? null,
       onSelect: (id) => this._handleSelect(id),
       subscribe: (fn) => { this._listeners.add(fn); return () => this._listeners.delete(fn); },
       getPlotState: () => this.plotState,
@@ -92,6 +98,9 @@ export class RadarController {
           this.updateEntity(id, clampVelocity(e, vx, vy), { silent: true });
         },
         onDragEnd: (id) => this._afterMutation(this.engagement?.entities.find((e) => e.id === id)),
+        onFogStart: (x, y) => this.fogStart(x, y),
+        onFogPaint: (x, y) => this.fogPaint(x, y),
+        onFogEnd: () => this.fogEnd(),
       } : null,
       player: this.role === 'player' ? {
         isPlotting: () => Boolean(this.plotState),
@@ -282,6 +291,59 @@ export class RadarController {
     if (this.selectedId === id) this.selectedId = null;
     this._save(); this._notify();
     if (this.engagement.status === 'active') this.net?.send('radar:scene-update', { removedId: id });
+  }
+
+  // ---------- GM: fog of war (paint reveal strokes) ----------
+  /** Toggle the fog on/off (off = players see everything). */
+  setFogEnabled(on) {
+    if (!this.engagement) return;
+    Fog.ensureFog(this.engagement).enabled = !!on;
+    this._afterFog();
+  }
+
+  /** Begin a reveal stroke; painting implies fog is on. */
+  fogStart(x, y) {
+    if (this.role !== 'gm' || !this.engagement) return;
+    const fog = Fog.ensureFog(this.engagement);
+    fog.enabled = true;
+    Fog.startStroke(fog, x, y, this.fogBrush);
+    this._notify(); // live, local — broadcast/save on fogEnd
+  }
+
+  fogPaint(x, y) {
+    const fog = this.engagement?.fog;
+    if (this.role !== 'gm' || !fog) return;
+    Fog.extendStroke(fog, x, y);
+    this._notify();
+  }
+
+  fogEnd() { if (this.role === 'gm') this._afterFog(); }
+
+  undoFog() {
+    if (this.role !== 'gm' || !this.engagement?.fog) return;
+    Fog.undoStroke(this.engagement.fog);
+    this._afterFog();
+  }
+
+  clearFog() {
+    if (this.role !== 'gm' || !this.engagement?.fog) return;
+    Fog.clearFog(this.engagement.fog);
+    this._afterFog();
+  }
+
+  /** Save + (when live) broadcast the fog to players. */
+  _afterFog() {
+    this._save();
+    this._notify();
+    if (this.engagement?.status === 'active') {
+      this.net?.send('radar:fog', { fog: JSON.parse(JSON.stringify(this.engagement.fog)) });
+    }
+  }
+
+  _applyFog({ fog }) {
+    if (!this.engagement || !fog) return;
+    this.engagement.fog = fog;
+    this._notify();
   }
 
   enable() {

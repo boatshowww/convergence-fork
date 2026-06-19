@@ -14,6 +14,7 @@
  */
 import { DRAW_DISTANCE_KM, RING_SPACING_KM, TURN_SECONDS, speedOf } from '../model.js';
 import { navigableRadius, plotBounds, evaluateManeuver } from '../maneuver.js';
+import { isRevealed } from '../fog.js';
 
 // Aeterna palette (matches the app CSS vars)
 export const COLORS = {
@@ -41,8 +42,11 @@ export function makeRadarScene(Phaser) {
     create() {
       this.cameras.main.setBackgroundColor(COLORS.void);
 
+      this.role = this.bridge.getRole?.() ?? 'player';
+
       // layers (draw order)
       this.gRings = this.add.graphics();
+      this.gFog = this.add.graphics(); // reveal footprint glow (under contacts)
       this.gVectors = this.add.graphics();
       this.gPlot = this.add.graphics();
       this.gEntities = this.add.graphics();
@@ -56,10 +60,17 @@ export function makeRadarScene(Phaser) {
 
       // entity picking: nearest entity within tap radius (world km)
       this.dragId = null;
+      this.fogPainting = false;
       this.input.on('pointerdown', (pointer) => {
         const eng = this.bridge.getEngagement();
         if (!eng) return;
         const wp = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
+        // GM fog brush: paint reveal strokes (skip select/drag)
+        if (this.bridge.gm?.getMode?.() === 'fog') {
+          this.fogPainting = true;
+          this.bridge.gm.onFogStart(wp.x, wp.y);
+          return;
+        }
         // plot mode captures clicks (target point, then exit trajectory)
         if (this.bridge.player?.isPlotting()) {
           this.bridge.player.onPlotClick(wp.x, wp.y);
@@ -81,6 +92,12 @@ export function makeRadarScene(Phaser) {
       // 'vector' — the arrow tip is where it will be in one turn, so dragging the
       // drift point feels natural).
       this.input.on('pointermove', (pointer) => {
+        // GM fog brush: extend the active stroke while dragging
+        if (this.fogPainting && pointer.isDown) {
+          const wp = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
+          this.bridge.gm.onFogPaint(wp.x, wp.y);
+          return;
+        }
         // plot mode: live preview follows the cursor
         if (this.bridge.player?.isPlotting()) {
           const wp = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
@@ -99,6 +116,7 @@ export function makeRadarScene(Phaser) {
         }
       });
       this.input.on('pointerup', () => {
+        if (this.fogPainting) { this.bridge.gm?.onFogEnd?.(); this.fogPainting = false; }
         if (this.dragId && this.bridge.gm) this.bridge.gm.onDragEnd(this.dragId);
         this.dragId = null;
       });
@@ -124,15 +142,17 @@ export function makeRadarScene(Phaser) {
 
     redraw() {
       const eng = this.bridge.getEngagement();
-      this.gRings.clear(); this.gVectors.clear(); this.gEntities.clear(); this.gPlot.clear();
+      this.gRings.clear(); this.gFog.clear(); this.gVectors.clear(); this.gEntities.clear(); this.gPlot.clear();
       this.labels.clear(true, true);
       if (!eng) { this.drawSelection(); return; }
 
+      this._fog = this.bridge.getFog?.() ?? null; // for footprint + player culling
+
       const v = this.viewer();
       const cx = v?.x ?? 0, cy = v?.y ?? 0;
-      // don't recenter mid-drag — the camera chasing a dragged viewer ship makes
-      // the world slide under the GM's cursor
-      if (!this.dragId) this.fitCamera();
+      // don't recenter mid-drag/paint — the camera chasing the viewer makes the
+      // world slide under the GM's cursor
+      if (!this.dragId && !this.fogPainting) this.fitCamera();
 
       // range rings around the viewer + draw-distance edge
       for (let r = RING_SPACING_KM; r < DRAW_DISTANCE_KM; r += RING_SPACING_KM) {
@@ -158,10 +178,36 @@ export function makeRadarScene(Phaser) {
         }
       }
 
+      this.drawFog(v);
       for (const e of eng.entities) this.drawEntity(e, v);
       this.drawPlots(eng);
       this.drawPlotting();
       this.drawSelection();
+    }
+
+    /**
+     * Fog of war. Reveal = union of brush circles (fog.js). Players see only inside
+     * the revealed area (contacts outside are culled in drawEntity); we render that
+     * coverage as a soft sensor glow. The GM sees the same footprint faintly + a
+     * dashed outline so they know exactly what the players can see.
+     */
+    drawFog(v) {
+      const fog = this._fog;
+      if (!fog || !fog.enabled) return;
+      const zoom = this.cameras.main.zoom;
+      const isGm = this.role === 'gm';
+      for (const s of fog.strokes) {
+        for (const p of s.pts) {
+          // soft filled glow of scanned space
+          this.gFog.fillStyle(COLORS.own, isGm ? 0.05 : 0.07);
+          this.gFog.fillCircle(p.x, p.y, s.r);
+        }
+        if (isGm) {
+          // dashed outline of the coverage edge (GM-only situational awareness)
+          this.gFog.lineStyle(1.2 / zoom, COLORS.own, 0.5);
+          for (const p of s.pts) this.gFog.strokeCircle(p.x, p.y, s.r);
+        }
+      }
     }
 
     /** Confirmed plots (player: own; GM: everyone's) — dashed path + exit arrow. */
@@ -270,6 +316,11 @@ export function makeRadarScene(Phaser) {
     }
 
     drawEntity(e, v) {
+      // fog of war: a player can't see contacts outside the revealed area (their own
+      // ship is always visible). The GM sees everything.
+      if (this.role !== 'gm' && this._fog?.enabled && e.id !== v?.id && !isRevealed(this._fog, e.x, e.y)) {
+        return;
+      }
       const zoom = this.cameras.main.zoom;
       const px = (n) => n / zoom; // convert screen px to world units
       const color = this.entityColor(e, v);

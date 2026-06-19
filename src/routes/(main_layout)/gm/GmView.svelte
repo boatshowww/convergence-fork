@@ -81,8 +81,26 @@
               <span class="mode-toggle">
                 <button type="button" class="btn sm {radar.gmMode === 'move' ? 'gold' : 'ghost'}" onclick={() => radar.gmMode = 'move'}>Move</button>
                 <button type="button" class="btn sm {radar.gmMode === 'vector' ? 'gold' : 'ghost'}" onclick={() => radar.gmMode = 'vector'}>Vector</button>
+                <button type="button" class="btn sm {radar.gmMode === 'fog' ? 'gold' : 'ghost'}" onclick={() => radar.gmMode = 'fog'}>Fog</button>
               </span>
             </div>
+
+            {#if radar.gmMode === 'fog'}
+              <div class="palette-row fog-row">
+                <span class="fog-hint">Click-drag on the radar to reveal what players can see.</span>
+                <label class="num-label">Brush
+                  <input type="range" min="200" max="2000" step="100" bind:value={radar.fogBrush} />
+                  <span class="speed-chip">{radar.fogBrush} km</span>
+                </label>
+                <button type="button" class="btn ghost sm" onclick={() => radar.undoFog()}>Undo</button>
+                <button type="button" class="btn ghost sm" onclick={() => radar.clearFog()}>Clear</button>
+                {#if radar.engagement.fog?.enabled}
+                  <button type="button" class="btn ghost sm" onclick={() => radar.setFogEnabled(false)}>Reveal all</button>
+                {:else}
+                  <button type="button" class="btn gold sm" onclick={() => radar.setFogEnabled(true)}>Enable fog</button>
+                {/if}
+              </div>
+            {/if}
 
             <div class="radar-frame">
               <RadarCanvas bridge={radar.bridge()} />
@@ -102,7 +120,7 @@
                 {/if}
                 <button type="button" class="btn ghost sm" onclick={() => radar.removeEntity(sel.id)}>Delete</button>
               </div>
-            {:else}
+            {:else if radar.gmMode !== 'fog'}
               <p class="muted">Click a contact to select it; drag to {radar.gmMode === 'vector' ? 'set its velocity (arrow tip = next-turn position)' : 'reposition it'}.</p>
             {/if}
 
@@ -282,4 +300,7 @@
   .ready-chip { font-family: 'Chakra Petch', sans-serif; font-size: 10px; letter-spacing: 0.06em; padding: 3px 9px; border: 1px solid var(--edge); border-radius: 2px; color: var(--ink-faint); }
   .ready-chip.ready { color: var(--teal); border-color: var(--teal-dim); }
   .speed-chip { font-family: 'Chakra Petch', sans-serif; font-size: 11px; letter-spacing: 0.05em; color: var(--ink-dim); }
+  .fog-row { gap: 12px; padding: 6px 0; border-top: 1px dashed var(--edge); }
+  .fog-hint { font-size: 12px; color: var(--ink-faint); font-style: italic; }
+  .fog-row input[type='range'] { accent-color: var(--teal); }
 </style>

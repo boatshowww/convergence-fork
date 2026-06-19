@@ -129,10 +129,19 @@ the spec; the rest is compressed Excalidraw JSON).
   (+tests; game-feel constants `DELTA_V_PER_G=4`, `FUEL_PER_KMS=0.17` tuned to mockup numbers),
   `phaser/RadarScene.js` (bridge contract: getEngagement/getViewerEntityId/onSelect/subscribe),
   `RadarCanvas.svelte` (dynamic-imports Phaser), `demo.js` (mock-sandbox scene).
-- **Phases:** P1 foundation render ✅(built; verify pending) · P2 GM setup+sync(localStorage/
-  snapshot; `net.js` gains `radar:` prefix) · P3 plot+WEGO execute · P4 actions→existing check
-  queue with geometry-suggested DC (`difficulty.js`) · P5 fog of war (GM click-drag reveal
-  strokes) · P6 polish. Radar `check:attempt`s carry `{action, targetId, suggestedDc}`.
+- **Phases:** P1 foundation render ✅ · P2 GM setup+sync ✅(localStorage/snapshot; `net.js` has
+  `radar:` prefix) · P3 plot+WEGO execute ✅ · P4 actions→existing check queue w/ geometry-suggested
+  DC (`difficulty.js`) ✅ · **P5 fog of war ✅** · P6 polish (next). Radar `check:attempt`s carry
+  `{action, targetId, suggestedDc}`.
+- **P5 fog of war (2026-06-19):** `src/lib/radar/fog.js` (+ `fog.test.js`, 6 tests) — reveal model:
+  `engagement.fog = { enabled, strokes:[{id,r,pts[]}] }`; revealed = union of brush circles;
+  `isRevealed()`. GM paints via **`gmMode==='fog'`** click-drag (brush slider / Undo / Clear / Reveal-all
+  in `GmView`); `radarState` `fogStart/Paint/End`, `setFogEnabled`, `clearFog/undoFog`, `_afterFog` saves+
+  broadcasts `radar:fog`; rides in the engagement snapshot + localStorage automatically. Player render
+  (`RadarScene.drawFog` + cull in `drawEntity`): contacts outside the reveal are **hidden** (own ship
+  always shown), revealed area drawn as a soft sensor glow; GM sees all + a dashed footprint. Demo
+  sandbox seeds fog (headless-verified — debris hidden, bogey in the scanned lane visible). *Hard dark
+  veil = P6 polish.*
 - Mock `/player` center pane shows a **demo engagement** (headless-verifiable); real games show
   the radar when the GM enables an engagement (P2+). Proposed: `ALTER TABLE public.character ADD COLUMN cosmic_tokens smallint NOT NULL DEFAULT 0;` (cap of 2 still enforced in code). Flag explicitly + give Studio steps before wiring read/write.
 - **Exit-trajectory legibility (2026-06-17):** at the plot exit stage the scene draws the reachable
