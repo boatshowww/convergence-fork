@@ -3,6 +3,10 @@
 Project context and working notes for Claude Code sessions. Read this first; it
 exists so a fresh session doesn't have to re-derive everything.
 
+> **📋 START HERE:** `docs/PRD - Status & Roadmap.md` is the session-to-session handoff
+> (current progress + prioritized next steps across all initiatives). Read it right
+> after this file. Updated 2026-06-19.
+
 ## What this project is
 
 **Convergence** is a web-based, real-time, multiplayer tabletop RPG, intended to
